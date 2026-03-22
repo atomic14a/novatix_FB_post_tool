@@ -13,7 +13,7 @@ import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { createPost, updatePost } from "@/lib/actions/posts";
-import { Save, Send, Loader2, Play } from "lucide-react";
+import { Save, Send, Loader2, Play, Link2 } from "lucide-react";
 import { toast } from "sonner";
 
 const CTA_OPTIONS = [
@@ -24,6 +24,16 @@ const CTA_OPTIONS = [
   { value: "Contact Us", label: "Contact Us" },
   { value: "Apply Now", label: "Apply Now" },
 ];
+
+function inferMediaTypeFromUrl(url: string) {
+  const normalizedUrl = url.toLowerCase().split("?")[0].split("#")[0];
+
+  if (/\.(mp4|mov|webm|ogg|m4v)$/.test(normalizedUrl)) {
+    return "video/external";
+  }
+
+  return "image/external";
+}
 
 function CreatePostLoading() {
   return (
@@ -63,6 +73,8 @@ const CreatePostContent = () => {
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<string | null>(null);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [mediaLinkInput, setMediaLinkInput] = useState("");
+  const [mediaInputMode, setMediaInputMode] = useState<"upload" | "link">("upload");
   const [selectedPageName, setSelectedPageName] = useState("");
   const [isFakeVideo, setIsFakeVideo] = useState(true);
   const [fakeVideoDuration, setFakeVideoDuration] = useState("0");
@@ -110,6 +122,8 @@ const CreatePostContent = () => {
             setMediaUrl(post.media_url || null);
             setMediaPreview(post.media_url || null);
             setMediaType(post.media_type || null);
+            setMediaLinkInput(post.media_url || "");
+            setMediaInputMode(post.media_url ? "link" : "upload");
             setCta(post.cta || "");
             if (post.facebook_page_id) {
               const page = pagesData?.find((p: any) => p.id === post.facebook_page_id);
@@ -134,6 +148,7 @@ const CreatePostContent = () => {
   };
 
   const handleFileSelect = useCallback(async (file: File) => {
+    setMediaInputMode("upload");
     // Show local preview immediately
     const previewUrl = URL.createObjectURL(file);
     setMediaPreview(previewUrl);
@@ -158,6 +173,7 @@ const CreatePostContent = () => {
         .getPublicUrl(data.path);
 
       setMediaUrl(publicUrl);
+      setMediaLinkInput("");
       toast.success("Media uploaded!");
     } catch (error) {
       toast.error("Upload failed. Media will be stored locally for preview.");
@@ -170,6 +186,29 @@ const CreatePostContent = () => {
     setMediaPreview(null);
     setMediaType(null);
     setMediaUrl(null);
+    setMediaLinkInput("");
+  };
+
+  const handleUseMediaLink = () => {
+    const trimmedUrl = mediaLinkInput.trim();
+
+    if (!trimmedUrl) {
+      toast.error("Please paste an image or video URL first.");
+      return;
+    }
+
+    try {
+      new URL(trimmedUrl);
+    } catch {
+      toast.error("Please enter a valid media URL.");
+      return;
+    }
+
+    setMediaUrl(trimmedUrl);
+    setMediaPreview(trimmedUrl);
+    setMediaType(inferMediaTypeFromUrl(trimmedUrl));
+    setMediaInputMode("link");
+    toast.success("Media link added!");
   };
 
   const handleSave = async (status: "draft" | "published") => {
@@ -341,18 +380,70 @@ const CreatePostContent = () => {
           {/* Media Upload */}
           <div className="space-y-2">
             <Label>Media</Label>
-            <MediaUploader
-              onFileSelect={handleFileSelect}
-              currentPreview={mediaPreview}
-              currentType={mediaType}
-              onRemove={handleRemoveMedia}
-            />
-            {uploading && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Uploading media...
+            <div className="rounded-xl border border-border bg-secondary/20 p-3 space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={mediaInputMode === "upload" ? "default" : "outline"}
+                  onClick={() => setMediaInputMode("upload")}
+                >
+                  Upload File
+                </Button>
+                <Button
+                  type="button"
+                  variant={mediaInputMode === "link" ? "default" : "outline"}
+                  onClick={() => setMediaInputMode("link")}
+                >
+                  Paste Link
+                </Button>
               </div>
-            )}
+
+              {mediaInputMode === "upload" ? (
+                <div className="space-y-3">
+                  <MediaUploader
+                    onFileSelect={handleFileSelect}
+                    currentPreview={mediaPreview}
+                    currentType={mediaType}
+                    onRemove={handleRemoveMedia}
+                  />
+                  {uploading && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Uploading media...
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Upload an image or video from your device.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Label htmlFor="mediaLink">Image or video URL</Label>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Input
+                      id="mediaLink"
+                      type="url"
+                      placeholder="https://example.com/image.jpg"
+                      value={mediaLinkInput}
+                      onChange={(e) => setMediaLinkInput(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={handleUseMediaLink}
+                    >
+                      <Link2 className="h-4 w-4" />
+                      Use Link
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Paste a direct `.jpg`, `.png`, `.webp`, or video file link.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Live Preview */}

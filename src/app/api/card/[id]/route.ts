@@ -39,7 +39,13 @@ export async function GET(
       return new Response("Post not found", { status: 404 });
     }
 
-    const ogImageUrl = `${appUrl}/api/og/${id}`;
+    // Use the uploaded image directly for normal image posts because
+    // Facebook is much more reliable at fetching a real public image URL
+    // than a generated OG image endpoint. Keep the generated route only
+    // for the fake-video overlay case.
+    const ogImageUrl = post.is_fake_video
+      ? `${appUrl}/api/og/${id}`
+      : post.media_url;
     
     // Default fallback redirect if no destination URL is provided
     const redirectUrl = post.destination_url || appUrl;
@@ -63,6 +69,7 @@ export async function GET(
     <meta property="og:title" content="${escapeHtml(post.title || '')}" />
     <meta property="og:description" content="${escapeHtml(post.card_description || '')}" />
     <meta property="og:image" content="${escapeHtml(ogImageUrl)}" />
+    <meta property="og:image:secure_url" content="${escapeHtml(ogImageUrl)}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:url" content="${escapeHtml(redirectUrl)}" />
