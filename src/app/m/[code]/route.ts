@@ -76,7 +76,7 @@ function buildMetaHtml(params: {
   ${facebookAppId ? `<meta property="fb:app_id" content="${escapeHtml(facebookAppId)}" />` : ""}
   ${ogImage ? `<meta property="og:image" content="${escapeHtml(ogImage)}" />` : ""}
   ${ogImage ? `<meta property="og:image:secure_url" content="${escapeHtml(ogImage)}" />` : ""}
-  ${ogImage ? `<meta property="og:image:type" content="${escapeHtml(imageType || "image/png")}" />` : ""}
+  ${ogImage ? `<meta property="og:image:type" content="${escapeHtml(imageType || "image/jpeg")}" />` : ""}
   ${ogImage ? `<meta property="og:image:width" content="1200" />` : ""}
   ${ogImage ? `<meta property="og:image:height" content="630" />` : ""}
   <meta name="twitter:card" content="summary_large_image" />
@@ -163,7 +163,7 @@ export async function GET(
 
   const shortUrl = `${appUrl}/m/${code}`;
   const displayDomain = normalizeDisplayDomain(metaLink.destination_url, metaLink.display_domain) || host;
-  const ogImage = metaLink.image_url ? `${appUrl}/api/meta-image/${code}` : "";
+  const ogImage = metaLink.image_url || "";
   const facebookAppId = process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || "";
   const html = buildMetaHtml({
     title: metaLink.meta_title || "Meta Link",
