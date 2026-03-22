@@ -1,7 +1,21 @@
+import { Buffer } from "node:buffer";
+
 import { ImageResponse } from "next/og";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+
+async function toDataUrl(imageUrl: string) {
+  const response = await fetch(imageUrl, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch source image: ${response.status}`);
+  }
+
+  const contentType = response.headers.get("content-type") || "image/png";
+  const arrayBuffer = await response.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString("base64");
+  return `data:${contentType};base64,${base64}`;
+}
 
 export async function GET(
   request: Request,
@@ -23,6 +37,8 @@ export async function GET(
     if (error || !metaLink || !metaLink.image_url) {
       return new Response("Not Found", { status: 404 });
     }
+
+    const imageSrc = await toDataUrl(metaLink.image_url);
 
     return new ImageResponse(
       (
@@ -51,7 +67,7 @@ export async function GET(
             }}
           >
             <img
-              src={metaLink.image_url}
+              src={imageSrc}
               alt={metaLink.meta_title || "Meta image"}
               style={{
                 maxWidth: "100%",
