@@ -1,15 +1,18 @@
 import { Metadata } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { headers } from "next/headers";
 
 export const dynamic = 'force-dynamic';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const headersList = await headers();
+  const host = headersList.get("host") || "";
+  const appUrl = host ? `https://${host}` : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
   try {
     const { data: post, error } = await supabase
@@ -19,7 +22,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       .single();
 
     if (error || !post) {
-      return { title: 'Post Not Found' };
+      console.error(`[Metadata Error] Post ${id} not found:`, error);
+      return { title: 'Novatix FB Tool' };
     }
 
     const ogImageUrl = `${appUrl}/api/og/${id}`;
@@ -49,19 +53,27 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       },
     };
   } catch (err: any) {
-    console.error("Metadata generation error:", err);
+    console.error(`[Metadata Exception] Post ${id}:`, err);
     return { title: 'Novatix FB Tool' };
   }
 }
 
 export default async function OpenGraphRedirectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { data: post, error } = await supabase.from('posts').select('destination_url').eq('id', id).single();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+  const { data: post, error } = await supabase
+    .from('posts')
+    .select('destination_url')
+    .eq('id', id)
+    .single();
 
   if (error || !post || !post.destination_url) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
-        <p className="text-xl text-muted-foreground">This post has no external link.</p>
+        <p className="text-xl text-muted-foreground">This post has no external link or was not found.</p>
       </div>
     );
   }
