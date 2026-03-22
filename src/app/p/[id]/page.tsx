@@ -8,11 +8,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const headersList = await headers();
   const host = headersList.get("host") || "";
+  
+  // Force HTTPS for production metadata
   const appUrl = host ? `https://${host}` : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
 
+  // Use Service Role Key if available to bypass RLS for the Crawler
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabase = createClient(supabaseUrl, serviceKey);
 
   try {
     const { data: post, error } = await supabase
@@ -23,19 +26,20 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
     if (error || !post) {
       console.error(`[Metadata Error] Post ${id} not found:`, error);
-      return { title: 'Novatix FB Tool' };
+      return { title: 'Post Preview' };
     }
 
     const ogImageUrl = `${appUrl}/api/og/${id}`;
+    const displayDomain = post.card_description || host;
 
     return {
-      title: post.title || 'Novatix FB Tool',
+      title: post.title || 'Post Preview',
       description: post.card_description || '',
       openGraph: {
-        title: post.title || 'Novatix FB Tool',
+        title: post.title || 'Post Preview',
         description: post.card_description || '',
         url: `${appUrl}/p/${id}`,
-        siteName: 'Novatix FB Tool',
+        siteName: displayDomain, // Mask the site name with the Display URL (Fewfeed style)
         images: [
           {
             url: ogImageUrl,
@@ -47,22 +51,23 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         type: 'website',
       },
       twitter: {
-        title: post.title || 'Novatix FB Tool',
+        title: post.title || 'Post Preview',
         description: post.card_description || '',
         images: [ogImageUrl],
       },
     };
   } catch (err: any) {
     console.error(`[Metadata Exception] Post ${id}:`, err);
-    return { title: 'Novatix FB Tool' };
+    return { title: 'Post Preview' };
   }
 }
 
 export default async function OpenGraphRedirectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  // Always use Service Role for internal redirects to ensure 0% RLS failure
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabase = createClient(supabaseUrl, serviceKey);
 
   const { data: post, error } = await supabase
     .from('posts')
