@@ -24,6 +24,8 @@ export type Post = {
   updated_at: string;
 };
 
+import { headers } from "next/headers";
+
 // Helper: Publish a post to Facebook using smart logic
 async function publishToFacebookGraphApi(
   postId: string,
@@ -39,11 +41,18 @@ async function publishToFacebookGraphApi(
   }
 ) {
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-    // Robust production check: only fallback if we are CERTAIN we are on a dev machine
-    const isLocalhost = !appUrl || appUrl.includes("localhost") || appUrl.includes("127.0.0.1") || appUrl.includes("lhr.life");
+    const headersList = await headers();
+    const host = headersList.get("host") || "";
+    const proto = headersList.get("x-forwarded-proto") || "https";
+    const dynamicAppUrl = `${proto}://${host}`;
+
+    const envAppUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    const appUrl = envAppUrl && !envAppUrl.includes("localhost") ? envAppUrl : dynamicAppUrl;
     
-    console.log(`Publishing post ${postId} from URL: ${appUrl} (isLocalhost: ${isLocalhost})`);
+    // Robust production check: only fallback if we are CERTAIN we are on a dev machine
+    const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("lhr.life");
+    
+    console.log(`Publishing post ${postId} from URL: ${appUrl} (Host: ${host}, Proto: ${proto})`);
 
     let endpoint = "";
     let payload = new URLSearchParams();

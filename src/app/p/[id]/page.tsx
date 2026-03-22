@@ -8,33 +8,44 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
   try {
-    const { data: post, error } = await supabase.from('posts').select('*').eq('id', params.id).single();
+    const { data: post, error } = await supabase
+      .from('posts')
+      .select('title, card_description, media_url, is_fake_video')
+      .eq('id', params.id)
+      .single();
 
     if (error || !post) {
       return { title: 'Post Not Found' };
     }
 
-    const title = post.title || 'Novatix Post';
-    const description = post.card_description || '';
-    const canonicalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/p/${params.id}`;
+    const ogImageUrl = `${appUrl}/api/og/${params.id}`;
 
     return {
-      title,
-      description,
+      title: post.title || 'Novatix FB Tool',
+      description: post.card_description || '',
       openGraph: {
-        title,
-        description,
-        url: canonicalUrl,
-        type: 'article',
-        ...(post.media_url && { images: [{ url: post.media_url }] }),
+        title: post.title || 'Novatix FB Tool',
+        description: post.card_description || '',
+        url: `${appUrl}/p/${params.id}`,
+        siteName: 'Novatix FB Tool',
+        images: [
+          {
+            url: ogImageUrl,
+            width: 1200,
+            height: 630,
+            alt: post.title || 'Post Image',
+          },
+        ],
+        type: 'website',
       },
       twitter: {
-        card: post.media_url ? 'summary_large_image' : 'summary',
-        title,
-        description,
-        ...(post.media_url && { images: [{ url: post.media_url }] }),
-      }
+        title: post.title || 'Novatix FB Tool',
+        description: post.card_description || '',
+        images: [ogImageUrl],
+      },
     };
   } catch (err: any) {
     console.error("Metadata generation error:", err);
