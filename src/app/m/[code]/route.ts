@@ -36,8 +36,18 @@ function buildMetaHtml(params: {
   displayDomain: string;
   ogImage: string;
   imageType: string;
+  facebookAppId: string;
 }) {
-  const { title, description, shortUrl, destinationUrl, displayDomain, ogImage, imageType } = params;
+  const {
+    title,
+    description,
+    shortUrl,
+    destinationUrl,
+    displayDomain,
+    ogImage,
+    imageType,
+    facebookAppId,
+  } = params;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -50,11 +60,10 @@ function buildMetaHtml(params: {
   <meta property="og:type" content="website" />
   <meta property="og:url" content="${escapeHtml(shortUrl)}" />
   <meta property="og:site_name" content="${escapeHtml(displayDomain)}" />
+  ${facebookAppId ? `<meta property="fb:app_id" content="${escapeHtml(facebookAppId)}" />` : ""}
   ${ogImage ? `<meta property="og:image" content="${escapeHtml(ogImage)}" />` : ""}
   ${ogImage ? `<meta property="og:image:secure_url" content="${escapeHtml(ogImage)}" />` : ""}
   ${ogImage ? `<meta property="og:image:type" content="${escapeHtml(imageType || "image/png")}" />` : ""}
-  ${ogImage ? `<meta property="og:image:width" content="1200" />` : ""}
-  ${ogImage ? `<meta property="og:image:height" content="630" />` : ""}
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${escapeHtml(title)}" />
   <meta name="twitter:description" content="${escapeHtml(description)}" />
@@ -140,6 +149,7 @@ export async function GET(
   const shortUrl = `${appUrl}/m/${code}`;
   const displayDomain = normalizeDisplayDomain(metaLink.destination_url, metaLink.display_domain) || host;
   const ogImage = metaLink.image_url || "";
+  const facebookAppId = process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || "";
   const html = buildMetaHtml({
     title: metaLink.meta_title || "Meta Link",
     description: metaLink.meta_description || "",
@@ -148,6 +158,7 @@ export async function GET(
     displayDomain,
     ogImage,
     imageType: metaLink.image_type || "image/png",
+    facebookAppId,
   });
 
   return new Response(html, {
