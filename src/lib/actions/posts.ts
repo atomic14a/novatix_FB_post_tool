@@ -79,8 +79,8 @@ async function publishToFacebookGraphApi(
       endpoint = `https://graph.facebook.com/v21.0/${pageId}/feed`;
       payload.append("message", fullMessage);
       
-      // Force Link Card behavior via our stealth redirect route
-      const linkToPost = isImage ? `${appUrl}/p/${postId}` : postData.destination_url!;
+      // Force Link Card behavior via our Raw HTML Fewfeed Engine
+      const linkToPost = isImage ? `${appUrl}/api/card/${postId}` : postData.destination_url!;
       payload.append("link", linkToPost);
       
       console.log(`[FB Router] Routing to feed/link: ${linkToPost}`);
