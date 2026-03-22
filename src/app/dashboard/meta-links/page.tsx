@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MediaUploader } from "@/components/media-uploader";
@@ -48,23 +47,11 @@ type MetaLink = {
   updated_at: string;
 };
 
-const CTA_OPTIONS = [
-  { value: "", label: "No CTA" },
-  { value: "Learn More", label: "Learn More" },
-  { value: "Shop Now", label: "Shop Now" },
-  { value: "Sign Up", label: "Sign Up" },
-  { value: "Contact Us", label: "Contact Us" },
-  { value: "Apply Now", label: "Apply Now" },
-];
-
 const emptyForm = {
   name: "",
-  shortCode: "",
   destinationUrl: "",
   metaTitle: "",
   metaDescription: "",
-  displayDomain: "",
-  cta: "Learn More",
   imageUrl: "",
   imageType: "",
 };
@@ -139,24 +126,7 @@ export default function MetaLinksPage() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  async function getUniqueShortCode(preferredCode?: string) {
-    const requestedCode = preferredCode?.trim().toLowerCase();
-
-    if (requestedCode) {
-      const { data } = await supabase
-        .from("meta_links")
-        .select("id")
-        .eq("short_code", requestedCode)
-        .limit(1);
-
-      const existing = data?.[0];
-      if (existing && existing.id !== editingId) {
-        throw new Error("This short code is already in use.");
-      }
-
-      return requestedCode;
-    }
-
+  async function getUniqueShortCode() {
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const code = generateRandomCode();
       const { data } = await supabase
@@ -251,7 +221,10 @@ export default function MetaLinksPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Unauthorized");
 
-      const shortCode = await getUniqueShortCode(form.shortCode);
+      const shortCode = editingId
+        ? links.find((link) => link.id === editingId)?.short_code || (await getUniqueShortCode())
+        : await getUniqueShortCode();
+
       const payload = {
         user_id: user.id,
         name: form.name.trim() || form.metaTitle.trim(),
@@ -259,8 +232,8 @@ export default function MetaLinksPage() {
         destination_url: form.destinationUrl.trim(),
         meta_title: form.metaTitle.trim(),
         meta_description: form.metaDescription.trim() || null,
-        display_domain: normalizeDisplayDomain(form.displayDomain || form.destinationUrl),
-        cta: form.cta || null,
+        display_domain: normalizeDisplayDomain(form.destinationUrl),
+        cta: null,
         image_url: form.imageUrl.trim() || null,
         image_type: form.imageType || null,
         updated_at: new Date().toISOString(),
@@ -299,12 +272,9 @@ export default function MetaLinksPage() {
     setImageInputMode("link");
     setForm({
       name: link.name || "",
-      shortCode: link.short_code,
       destinationUrl: link.destination_url,
       metaTitle: link.meta_title,
       metaDescription: link.meta_description || "",
-      displayDomain: link.display_domain || "",
-      cta: link.cta || "",
       imageUrl: link.image_url || "",
       imageType: link.image_type || "",
     });
@@ -410,7 +380,7 @@ export default function MetaLinksPage() {
           <CardHeader>
             <CardTitle>{editingId ? "Edit Meta Link" : "Create Meta Link"}</CardTitle>
             <CardDescription>
-              Build a tracked short link with your redirect URL, metadata, CTA, and image.
+              Build a tracked short link with your redirect URL, title, description, and image.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -424,26 +394,15 @@ export default function MetaLinksPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="destinationUrl">Redirect URL</Label>
-                <Input
-                  id="destinationUrl"
-                  type="url"
-                  placeholder="https://your-site.com/page"
-                  value={form.destinationUrl}
-                  onChange={(e) => updateForm("destinationUrl", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="shortCode">Short Code</Label>
-                <Input
-                  id="shortCode"
-                  placeholder="auto-generated if empty"
-                  value={form.shortCode}
-                  onChange={(e) => updateForm("shortCode", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="destinationUrl">Redirect URL</Label>
+              <Input
+                id="destinationUrl"
+                type="url"
+                placeholder="https://your-site.com/page"
+                value={form.destinationUrl}
+                onChange={(e) => updateForm("destinationUrl", e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -465,32 +424,6 @@ export default function MetaLinksPage() {
                 onChange={(e) => updateForm("metaDescription", e.target.value)}
                 className="min-h-[110px] resize-none"
               />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="displayDomain">Display Domain</Label>
-                <Input
-                  id="displayDomain"
-                  placeholder="example.com"
-                  value={form.displayDomain}
-                  onChange={(e) => updateForm("displayDomain", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cta">CTA</Label>
-                <Select
-                  id="cta"
-                  value={form.cta}
-                  onChange={(e) => updateForm("cta", e.target.value)}
-                >
-                  {CTA_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
             </div>
 
             <div className="space-y-3">
@@ -594,7 +527,7 @@ export default function MetaLinksPage() {
                 </div>
                 <div className="space-y-3 p-4">
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {normalizeDisplayDomain(form.displayDomain || form.destinationUrl) || "yourdomain.com"}
+                    {normalizeDisplayDomain(form.destinationUrl) || "yourdomain.com"}
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold">
@@ -604,13 +537,6 @@ export default function MetaLinksPage() {
                       {form.metaDescription || "Your meta description will appear here."}
                     </p>
                   </div>
-                  {form.cta && (
-                    <div className="pt-1">
-                      <span className="inline-flex rounded-md bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
-                        {form.cta}
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
             </CardContent>
@@ -651,8 +577,7 @@ export default function MetaLinksPage() {
                             {shortUrl}
                           </div>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                            <span>{link.display_domain || normalizeDisplayDomain(link.destination_url)}</span>
-                            <span>{link.cta || "No CTA"}</span>
+                            <span>{normalizeDisplayDomain(link.destination_url)}</span>
                             <span>{new Date(link.created_at).toLocaleDateString("en-US")}</span>
                           </div>
                         </div>
@@ -665,7 +590,7 @@ export default function MetaLinksPage() {
                           <Button variant="outline" size="icon" onClick={() => copyShortLink(link.short_code)}>
                             <Copy className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="icon" onClick={() => window.open(shortUrl, "_blank")}>
+                          <Button variant="outline" size="icon" onClick={() => window.open(shortUrl, "_blank") }>
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                           <Button variant="outline" size="icon" onClick={() => handleEdit(link)}>
