@@ -59,12 +59,13 @@ export async function GET(
       meta_description: string | null;
       image_url: string | null;
       display_domain: string | null;
+      image_type: string | null;
     } | null = null;
 
     if (metaCode) {
       const { data } = await supabase
         .from("meta_links")
-        .select("meta_title, meta_description, image_url, display_domain")
+        .select("meta_title, meta_description, image_url, display_domain, image_type")
         .eq("short_code", metaCode)
         .eq("is_active", true)
         .single();
@@ -86,18 +87,20 @@ export async function GET(
     }
 
     let ogImageUrl = "";
+    let ogImageType = "image/jpeg";
+
     if (post.media_url) {
       ogImageUrl = post.is_fake_video ? `${appUrl}/api/og/${id}` : post.media_url;
-    } else if (metaCode && metaLink?.image_url) {
-      ogImageUrl = `${appUrl}/api/meta-image/${metaCode}`;
+    } else if (metaLink?.image_url) {
+      ogImageUrl = metaLink.image_url;
+      ogImageType = metaLink.image_type || ogImageType;
     }
 
     const imageMeta = ogImageUrl
       ? `
     <meta property="og:image" content="${escapeHtml(ogImageUrl)}" />
     <meta property="og:image:secure_url" content="${escapeHtml(ogImageUrl)}" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="${escapeHtml(ogImageType)}" />
     <meta name="twitter:image" content="${escapeHtml(ogImageUrl)}" />`
       : "";
 
