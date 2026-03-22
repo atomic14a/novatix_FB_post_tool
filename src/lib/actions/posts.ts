@@ -49,10 +49,10 @@ async function publishToFacebookGraphApi(
     const envAppUrl = process.env.NEXT_PUBLIC_APP_URL || "";
     const appUrl = envAppUrl && !envAppUrl.includes("localhost") ? envAppUrl : dynamicAppUrl;
     
-    // Robust production check: only fallback if we are CERTAIN we are on a dev machine
-    const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("lhr.life");
+    // STRICT PRODUCTION CHECK: Only use localhost fallback if we are on a private IP/local dev domain
+    const isActuallyLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("lhr.life");
     
-    console.log(`Publishing post ${postId} from URL: ${appUrl} (Host: ${host}, Proto: ${proto})`);
+    console.log(`[FB Router] Post: ${postId} | URL: ${appUrl} | Host: ${host} | isLocalhost: ${isActuallyLocalhost}`);
 
     let endpoint = "";
     let payload = new URLSearchParams();
@@ -74,14 +74,16 @@ async function publishToFacebookGraphApi(
       "Apply Now": "APPLY_NOW"
     };
 
-    if (isLink && !isLocalhost) {
-      // Case D: Link Card (using Open Graph Redirect if image exists, or direct link if not)
+    if (isLink && !isActuallyLocalhost) {
+      // Case D: PROD Link Card (using Open Graph Redirect)
       endpoint = `https://graph.facebook.com/v21.0/${pageId}/feed`;
       payload.append("message", fullMessage);
       
-      // If we have an image, we use our stealth redirect route to force the image into the card
+      // Force Link Card behavior via our stealth redirect route
       const linkToPost = isImage ? `${appUrl}/p/${postId}` : postData.destination_url!;
       payload.append("link", linkToPost);
+      
+      console.log(`[FB Router] Routing to feed/link: ${linkToPost}`);
       
       if (postData.cta && ctaMap[postData.cta]) {
         payload.append("call_to_action", JSON.stringify({
@@ -90,13 +92,12 @@ async function publishToFacebookGraphApi(
         }));
       }
     } else if (isImage) {
-      // Case C: Image Only (or internal Image fallback for localhost testing)
+      // Case C: Image Upload (Only used if no link provided OR on localhost testing)
       endpoint = `https://graph.facebook.com/v21.0/${pageId}/photos`;
       payload.append("url", postData.media_url!);
       
       const captionParts = [fullMessage];
-      if (isLink && isLocalhost) {
-        // Fallback for localhost testing: append destination URL to the image's text caption
+      if (isLink && isActuallyLocalhost) {
         captionParts.push(postData.destination_url!);
       }
       payload.append("caption", captionParts.filter(Boolean).join("\n\n"));
