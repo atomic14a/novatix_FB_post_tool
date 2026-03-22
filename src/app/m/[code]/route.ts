@@ -28,6 +28,19 @@ function isBotTraffic(userAgent: string) {
   return /(facebookexternalhit|meta-externalagent|facebot|twitterbot|linkedinbot|slackbot|telegrambot|whatsapp|discordbot|bot|crawler|spider)/i.test(userAgent);
 }
 
+function normalizeImageType(imageType?: string | null, imageUrl?: string | null) {
+  if (imageType && /^[a-z]+\/[a-z0-9.+-]+$/i.test(imageType) && !imageType.endsWith("/external")) {
+    return imageType;
+  }
+
+  const normalizedUrl = (imageUrl || "").toLowerCase().split("?")[0].split("#")[0];
+
+  if (normalizedUrl.endsWith(".png")) return "image/png";
+  if (normalizedUrl.endsWith(".webp")) return "image/webp";
+  if (normalizedUrl.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+}
+
 function buildMetaHtml(params: {
   title: string;
   description: string;
@@ -64,6 +77,8 @@ function buildMetaHtml(params: {
   ${ogImage ? `<meta property="og:image" content="${escapeHtml(ogImage)}" />` : ""}
   ${ogImage ? `<meta property="og:image:secure_url" content="${escapeHtml(ogImage)}" />` : ""}
   ${ogImage ? `<meta property="og:image:type" content="${escapeHtml(imageType || "image/jpeg")}" />` : ""}
+  ${ogImage ? `<meta property="og:image:width" content="1200" />` : ""}
+  ${ogImage ? `<meta property="og:image:height" content="630" />` : ""}
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${escapeHtml(title)}" />
   <meta name="twitter:description" content="${escapeHtml(description)}" />
@@ -157,7 +172,7 @@ export async function GET(
     destinationUrl: metaLink.destination_url,
     displayDomain,
     ogImage,
-    imageType: metaLink.image_type || "image/jpeg",
+    imageType: normalizeImageType(metaLink.image_type, metaLink.image_url),
     facebookAppId,
   });
 

@@ -59,11 +59,15 @@ const emptyForm = {
 function inferMediaTypeFromUrl(url: string) {
   const normalizedUrl = url.toLowerCase().split("?")[0].split("#")[0];
 
-  if (/\.(mp4|mov|webm|ogg|m4v)$/.test(normalizedUrl)) {
-    return "video/external";
-  }
+  if (/\.(mp4|m4v)$/.test(normalizedUrl)) return "video/mp4";
+  if (/\.(webm)$/.test(normalizedUrl)) return "video/webm";
+  if (/\.(mov)$/.test(normalizedUrl)) return "video/quicktime";
+  if (/\.(ogg)$/.test(normalizedUrl)) return "video/ogg";
+  if (/\.(png)$/.test(normalizedUrl)) return "image/png";
+  if (/\.(webp)$/.test(normalizedUrl)) return "image/webp";
+  if (/\.(gif)$/.test(normalizedUrl)) return "image/gif";
 
-  return "image/external";
+  return "image/jpeg";
 }
 
 function normalizeDisplayDomain(value: string) {
@@ -167,7 +171,7 @@ export default function MetaLinksPage() {
       setForm((current) => ({
         ...current,
         imageUrl: publicUrl,
-        imageType: file.type,
+        imageType: file.type || inferMediaTypeFromUrl(publicUrl),
       }));
 
       toast.success("Image uploaded!");
@@ -564,19 +568,19 @@ export default function MetaLinksPage() {
                     <div key={link.id} className="rounded-xl border border-border p-4">
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0 space-y-2">
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex flex-wrap items-center gap-2">
                             <h3 className="font-semibold">{link.meta_title}</h3>
                             <Badge variant={link.is_active === false ? "secondary" : "success"}>
                               {link.is_active === false ? "Inactive" : "Active"}
                             </Badge>
                           </div>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
+                          <p className="line-clamp-2 text-sm text-muted-foreground">
                             {link.meta_description || "No description added."}
                           </p>
-                          <div className="text-xs text-muted-foreground break-all">
+                          <div className="break-all text-xs text-muted-foreground">
                             {shortUrl}
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                             <span>{normalizeDisplayDomain(link.destination_url)}</span>
                             <span>{new Date(link.created_at).toLocaleDateString("en-US")}</span>
                           </div>
@@ -590,7 +594,7 @@ export default function MetaLinksPage() {
                           <Button variant="outline" size="icon" onClick={() => copyShortLink(link.short_code)}>
                             <Copy className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="icon" onClick={() => window.open(shortUrl, "_blank") }>
+                          <Button variant="outline" size="icon" onClick={() => window.open(shortUrl, "_blank")}>
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                           <Button variant="outline" size="icon" onClick={() => handleEdit(link)}>
