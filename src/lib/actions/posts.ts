@@ -39,8 +39,12 @@ async function publishToFacebookGraphApi(
   }
 ) {
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const isLocalhost = appUrl.includes("localhost") || appUrl.includes("127.0.0.1");
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    // Robust production check: only fallback if we are CERTAIN we are on a dev machine
+    const isLocalhost = !appUrl || appUrl.includes("localhost") || appUrl.includes("127.0.0.1") || appUrl.includes("lhr.life");
+    
+    console.log(`Publishing post ${postId} from URL: ${appUrl} (isLocalhost: ${isLocalhost})`);
+
     let endpoint = "";
     let payload = new URLSearchParams();
     payload.append("access_token", pageAccessToken);
@@ -61,16 +65,19 @@ async function publishToFacebookGraphApi(
       "Apply Now": "APPLY_NOW"
     };
 
-    if (isImage && isLink && !isLocalhost) {
-      // Case D: Image + Link (Smart Redirect Open Graph) - Only works on public domains
+    if (isLink && !isLocalhost) {
+      // Case D: Link Card (using Open Graph Redirect if image exists, or direct link if not)
       endpoint = `https://graph.facebook.com/v21.0/${pageId}/feed`;
       payload.append("message", fullMessage);
-      payload.append("link", `${appUrl}/p/${postId}`);
+      
+      // If we have an image, we use our stealth redirect route to force the image into the card
+      const linkToPost = isImage ? `${appUrl}/p/${postId}` : postData.destination_url!;
+      payload.append("link", linkToPost);
       
       if (postData.cta && ctaMap[postData.cta]) {
         payload.append("call_to_action", JSON.stringify({
           type: ctaMap[postData.cta],
-          value: { link: `${appUrl}/p/${postId}` }
+          value: { link: linkToPost }
         }));
       }
     } else if (isImage) {
