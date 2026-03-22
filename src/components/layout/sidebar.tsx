@@ -9,6 +9,7 @@ import {
   FileText,
   Send,
   Settings,
+  Link2,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/facebook-pages", label: "Facebook Pages", icon: Facebook },
   { href: "/dashboard/create-post", label: "Create Post", icon: PenSquare },
+  { href: "/dashboard/meta-links", label: "Meta Links", icon: Link2 },
   { href: "/dashboard/drafts", label: "Drafts", icon: FileText },
   { href: "/dashboard/published", label: "Published Posts", icon: Send },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
