@@ -5,9 +5,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -16,7 +17,7 @@ export async function GET(
     const { data: post, error } = await supabase
       .from('posts')
       .select('media_url, is_fake_video')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (error || !post || !post.media_url) {

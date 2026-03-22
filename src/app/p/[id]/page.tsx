@@ -7,21 +7,22 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   try {
     const { data: post, error } = await supabase
       .from('posts')
       .select('title, card_description, media_url, is_fake_video')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (error || !post) {
       return { title: 'Post Not Found' };
     }
 
-    const ogImageUrl = `${appUrl}/api/og/${params.id}`;
+    const ogImageUrl = `${appUrl}/api/og/${id}`;
 
     return {
       title: post.title || 'Novatix FB Tool',
@@ -29,7 +30,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       openGraph: {
         title: post.title || 'Novatix FB Tool',
         description: post.card_description || '',
-        url: `${appUrl}/p/${params.id}`,
+        url: `${appUrl}/p/${id}`,
         siteName: 'Novatix FB Tool',
         images: [
           {
@@ -49,12 +50,13 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     };
   } catch (err: any) {
     console.error("Metadata generation error:", err);
-    return { title: `Error: ${err?.message || 'Unknown'}` };
+    return { title: 'Novatix FB Tool' };
   }
 }
 
-export default async function OpenGraphRedirectPage({ params }: { params: { id: string } }) {
-  const { data: post, error } = await supabase.from('posts').select('destination_url').eq('id', params.id).single();
+export default async function OpenGraphRedirectPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { data: post, error } = await supabase.from('posts').select('destination_url').eq('id', id).single();
 
   if (error || !post || !post.destination_url) {
     return (
