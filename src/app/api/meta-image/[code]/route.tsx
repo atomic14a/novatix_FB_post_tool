@@ -34,20 +34,34 @@ export async function GET(
             alignItems: "center",
             justifyContent: "center",
             position: "relative",
-            background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+            background: "#ffffff",
+            overflow: "hidden",
           }}
         >
-          <img
-            src={metaLink.image_url}
-            alt={metaLink.meta_title || "Meta image"}
+          <div
             style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              width: "auto",
-              height: "auto",
-              objectFit: "contain",
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "24px",
+              boxSizing: "border-box",
+              background: "#ffffff",
             }}
-          />
+          >
+            <img
+              src={metaLink.image_url}
+              alt={metaLink.meta_title || "Meta image"}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "100%",
+                width: "auto",
+                height: "auto",
+                objectFit: "contain",
+              }}
+            />
+          </div>
         </div>
       ),
       {

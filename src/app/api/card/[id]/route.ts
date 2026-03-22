@@ -28,6 +28,19 @@ function getMetaCode(destinationUrl: string | null, appUrl: string) {
   return null;
 }
 
+function normalizeImageType(imageType?: string | null, imageUrl?: string | null) {
+  if (imageType && /^[a-z]+\/[a-z0-9.+-]+$/i.test(imageType) && !imageType.endsWith("/external")) {
+    return imageType;
+  }
+
+  const normalizedUrl = (imageUrl || "").toLowerCase().split("?")[0].split("#")[0];
+
+  if (normalizedUrl.endsWith(".png")) return "image/png";
+  if (normalizedUrl.endsWith(".webp")) return "image/webp";
+  if (normalizedUrl.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -87,13 +100,14 @@ export async function GET(
     }
 
     let ogImageUrl = "";
-    let ogImageType = "image/jpeg";
+    let ogImageType = "image/png";
 
     if (post.media_url) {
       ogImageUrl = post.is_fake_video ? `${appUrl}/api/og/${id}` : post.media_url;
+      ogImageType = normalizeImageType(undefined, post.media_url);
     } else if (metaLink?.image_url) {
-      ogImageUrl = metaLink.image_url;
-      ogImageType = metaLink.image_type || ogImageType;
+      ogImageUrl = `${appUrl}/api/meta-image/${metaCode}`;
+      ogImageType = "image/png";
     }
 
     const imageMeta = ogImageUrl
@@ -101,6 +115,8 @@ export async function GET(
     <meta property="og:image" content="${escapeHtml(ogImageUrl)}" />
     <meta property="og:image:secure_url" content="${escapeHtml(ogImageUrl)}" />
     <meta property="og:image:type" content="${escapeHtml(ogImageType)}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta name="twitter:image" content="${escapeHtml(ogImageUrl)}" />`
       : "";
 
