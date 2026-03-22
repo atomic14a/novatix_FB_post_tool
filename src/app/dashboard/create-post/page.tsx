@@ -55,6 +55,7 @@ const CreatePostContent = () => {
 
   // Form state
   const [selectedPage, setSelectedPage] = useState("");
+  const [title, setTitle] = useState("");
   const [shortText, setShortText] = useState("");
   const [cardDescription, setCardDescription] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
@@ -100,6 +101,7 @@ const CreatePostContent = () => {
 
           if (post) {
             setSelectedPage(post.facebook_page_id || "");
+            setTitle(post.title || "");
             setShortText(post.short_text || "");
             setCardDescription(post.card_description || "");
             setDestinationUrl(post.destination_url || "");
@@ -108,6 +110,7 @@ const CreatePostContent = () => {
             setMediaUrl(post.media_url || null);
             setMediaPreview(post.media_url || null);
             setMediaType(post.media_type || null);
+            setCta(post.cta || "");
             if (post.facebook_page_id) {
               const page = pagesData?.find((p: any) => p.id === post.facebook_page_id);
               if (page) setSelectedPageName(page.page_name);
@@ -179,11 +182,11 @@ const CreatePostContent = () => {
 
       const postData = {
         facebook_page_id: selectedPage || undefined,
-        title: "\u200d", // Invisible character to drop Facebook API validation requirement without rendering thick title box
+        title: title.trim() || "\u200d", 
         short_text: shortText.trim() || undefined,
         card_description: cardDescription.trim() || undefined,
         destination_url: destinationUrl.trim() || undefined,
-        cta: undefined, // Hidden per user requirement
+        cta: cta || undefined,
         media_url: mediaUrl || undefined,
         media_type: mediaType || undefined,
         is_fake_video: isFakeVideo,
@@ -244,6 +247,16 @@ const CreatePostContent = () => {
             </Select>
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="title">Card Title :</Label>
+            <Input
+              id="title"
+              placeholder="e.g. HD"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+
           {/* Message / Short Text */}
         <div className="space-y-4">
           <div className="space-y-2">
@@ -275,6 +288,21 @@ const CreatePostContent = () => {
               value={cardDescription}
               onChange={(e) => setCardDescription(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="cta">Call to Action (Optional Button)</Label>
+            <Select
+              id="cta"
+              value={cta}
+              onChange={(e) => setCta(e.target.value)}
+            >
+              {CTA_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
 
