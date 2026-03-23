@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -25,6 +25,9 @@ import {
   Trash2,
   MousePointerClick,
   Play,
+  ArrowRight,
+  CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -96,9 +99,10 @@ export default function MetaLinksPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [imageInputMode, setImageInputMode] = useState<"upload" | "link">("upload");
   const [form, setForm] = useState(emptyForm);
+  const [lastCreatedUrl, setLastCreatedUrl] = useState("");
 
   useEffect(() => {
-    loadLinks();
+    void loadLinks();
   }, []);
 
   async function loadLinks() {
@@ -164,9 +168,7 @@ export default function MetaLinksPage() {
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("post-media")
-        .getPublicUrl(data.path);
+      const { data: { publicUrl } } = supabase.storage.from("post-media").getPublicUrl(data.path);
 
       setForm((current) => ({
         ...current,
@@ -215,7 +217,7 @@ export default function MetaLinksPage() {
 
   async function handleSave() {
     if (!form.destinationUrl.trim() || !form.metaTitle.trim()) {
-      toast.error("Destination URL and meta title are required.");
+      toast.error("Redirect URL and title are required.");
       return;
     }
 
@@ -251,18 +253,17 @@ export default function MetaLinksPage() {
           .eq("user_id", user.id);
 
         if (error) throw error;
-        toast.success("Meta short link updated!");
+        setLastCreatedUrl(`${origin}/m/${shortCode}`);
+        toast.success("Meta Link updated!");
       } else {
-        const { error } = await supabase
-          .from("meta_links")
-          .insert(payload);
-
+        const { error } = await supabase.from("meta_links").insert(payload);
         if (error) throw error;
-        toast.success("Meta short link created!");
+        setLastCreatedUrl(`${origin}/m/${shortCode}`);
+        toast.success("Meta Link created!");
       }
 
       resetForm();
-      loadLinks();
+      await loadLinks();
     } catch (error) {
       console.error("Failed to save meta link:", error);
       toast.error(error instanceof Error ? error.message : "Failed to save meta link");
@@ -273,7 +274,7 @@ export default function MetaLinksPage() {
 
   function handleEdit(link: MetaLink) {
     setEditingId(link.id);
-    setImageInputMode("link");
+    setImageInputMode(link.image_url ? "link" : "upload");
     setForm({
       name: link.name || "",
       destinationUrl: link.destination_url,
@@ -282,54 +283,51 @@ export default function MetaLinksPage() {
       imageUrl: link.image_url || "",
       imageType: link.image_type || "",
     });
+    setLastCreatedUrl("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this meta short link?")) return;
+    if (!window.confirm("Delete this Meta Link?")) return;
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Unauthorized");
 
-      const { error } = await supabase
-        .from("meta_links")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
-
+      const { error } = await supabase.from("meta_links").delete().eq("id", id).eq("user_id", user.id);
       if (error) throw error;
 
       if (editingId === id) {
         resetForm();
       }
 
-      toast.success("Meta short link deleted");
-      loadLinks();
+      toast.success("Meta Link deleted");
+      await loadLinks();
     } catch (error) {
       console.error("Delete failed:", error);
-      toast.error("Failed to delete meta short link");
+      toast.error("Failed to delete Meta Link");
     }
   }
 
   async function copyShortLink(code: string) {
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/m/${code}`);
-      toast.success("Short link copied!");
+      toast.success("Meta Link copied!");
     } catch {
-      toast.error("Could not copy short link");
+      toast.error("Could not copy Meta Link");
     }
   }
 
   const totalClicks = links.reduce((sum, link) => sum + (link.click_count || 0), 0);
+  const previewDomain = useMemo(() => normalizeDisplayDomain(form.destinationUrl) || "yourdomain.com", [form.destinationUrl]);
 
   if (loading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-56" />
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <Skeleton className="h-[720px] rounded-xl" />
-          <Skeleton className="h-[720px] rounded-xl" />
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+          <Skeleton className="h-[780px] rounded-xl" />
+          <Skeleton className="h-[780px] rounded-xl" />
         </div>
       </div>
     );
@@ -338,8 +336,8 @@ export default function MetaLinksPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Meta Tag Editor"
-        description="Create tracked meta short links with title, description, image, and redirect target."
+        title="Meta Links"
+        description="Build the clickable link cards you will later publish to Facebook."
       >
         <Button variant="outline" className="gap-2" onClick={resetForm}>
           <Plus className="h-4 w-4" />
@@ -370,9 +368,7 @@ export default function MetaLinksPage() {
           <CardContent className="flex items-center justify-between p-5">
             <div>
               <p className="text-sm text-muted-foreground">Active Links</p>
-              <p className="mt-1 text-2xl font-semibold">
-                {links.filter((link) => link.is_active !== false).length}
-              </p>
+              <p className="mt-1 text-2xl font-semibold">{links.filter((link) => link.is_active !== false).length}</p>
             </div>
             <BarChart3 className="h-5 w-5 text-primary" />
           </CardContent>
@@ -382,20 +378,28 @@ export default function MetaLinksPage() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <CardHeader>
-            <CardTitle>{editingId ? "Edit Meta Link" : "Create Meta Link"}</CardTitle>
+            <CardTitle>{editingId ? "Edit Meta Link" : "Build a Meta Link"}</CardTitle>
             <CardDescription>
-              Build a tracked short link with your redirect URL, title, description, and image.
+              Fill the redirect, title, description, and image. Then generate a reusable link card.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {[
+                { step: "1", label: "Add destination" },
+                { step: "2", label: "Write card text" },
+                { step: "3", label: "Add image and generate" },
+              ].map((item) => (
+                <div key={item.step} className="rounded-xl border border-border bg-secondary/20 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Step {item.step}</p>
+                  <p className="mt-1 text-sm font-medium">{item.label}</p>
+                </div>
+              ))}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="name">Link Name</Label>
-              <Input
-                id="name"
-                placeholder="Campaign name"
-                value={form.name}
-                onChange={(e) => updateForm("name", e.target.value)}
-              />
+              <Input id="name" placeholder="Campaign name or internal label" value={form.name} onChange={(e) => updateForm("name", e.target.value)} />
             </div>
 
             <div className="space-y-2">
@@ -407,20 +411,27 @@ export default function MetaLinksPage() {
                 value={form.destinationUrl}
                 onChange={(e) => updateForm("destinationUrl", e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">This is where visitors will land after clicking the Meta Link.</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="metaTitle">Card Title</Label>
+                <Input
+                  id="metaTitle"
+                  placeholder="Example: HD Digital Tool"
+                  value={form.metaTitle}
+                  onChange={(e) => updateForm("metaTitle", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="domainPreview">Display Domain</Label>
+                <Input id="domainPreview" value={previewDomain} disabled />
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="metaTitle">Meta Title</Label>
-              <Input
-                id="metaTitle"
-                placeholder="Your card title"
-                value={form.metaTitle}
-                onChange={(e) => updateForm("metaTitle", e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="metaDescription">Meta Description</Label>
+              <Label htmlFor="metaDescription">Card Description</Label>
               <Textarea
                 id="metaDescription"
                 placeholder="Short card description"
@@ -430,23 +441,20 @@ export default function MetaLinksPage() {
               />
             </div>
 
-            <div className="space-y-3">
-              <Label>Link Card Image</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={imageInputMode === "upload" ? "default" : "outline"}
-                  onClick={() => setImageInputMode("upload")}
-                >
-                  Upload File
-                </Button>
-                <Button
-                  type="button"
-                  variant={imageInputMode === "link" ? "default" : "outline"}
-                  onClick={() => setImageInputMode("link")}
-                >
-                  Paste Link
-                </Button>
+            <div className="space-y-3 rounded-xl border border-border p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Card Image</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">Upload a file or paste a direct public image URL.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button type="button" variant={imageInputMode === "upload" ? "default" : "outline"} onClick={() => setImageInputMode("upload")}>
+                    Upload
+                  </Button>
+                  <Button type="button" variant={imageInputMode === "link" ? "default" : "outline"} onClick={() => setImageInputMode("link")}>
+                    Paste Link
+                  </Button>
+                </div>
               </div>
 
               {imageInputMode === "upload" ? (
@@ -478,9 +486,6 @@ export default function MetaLinksPage() {
                       Use Link
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Use a direct public image or video file URL for your card preview.
-                  </p>
                 </div>
               )}
             </div>
@@ -488,7 +493,7 @@ export default function MetaLinksPage() {
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button onClick={handleSave} disabled={saving} className="gap-2">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                {editingId ? "Update Link" : "Create Link"}
+                {editingId ? "Update Meta Link" : "Generate Meta Link"}
               </Button>
               {editingId && (
                 <Button variant="outline" onClick={resetForm}>
@@ -496,14 +501,43 @@ export default function MetaLinksPage() {
                 </Button>
               )}
             </div>
+
+            {lastCreatedUrl && (
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-400" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground">Your Meta Link is ready</p>
+                    <p className="mt-1 break-all text-sm text-muted-foreground">{lastCreatedUrl}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(lastCreatedUrl)}>
+                        <Copy className="mr-2 h-3.5 w-3.5" />
+                        Copy Link
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => window.open(lastCreatedUrl, "_blank")}>
+                        <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                        Open Link
+                      </Button>
+                      <Button size="sm" onClick={() => router.push(`/dashboard/create-post?meta=${encodeURIComponent(lastCreatedUrl)}`)}>
+                        <ArrowRight className="mr-2 h-3.5 w-3.5" />
+                        Use in Post
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <div className="space-y-6">
-          <Card>
+          <Card className="xl:sticky xl:top-24">
             <CardHeader>
-              <CardTitle>Live Preview</CardTitle>
-              <CardDescription>How your meta short link content is being packaged.</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Live Preview
+              </CardTitle>
+              <CardDescription>This is the card style you are packaging into the generated Meta Link.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -530,16 +564,10 @@ export default function MetaLinksPage() {
                   )}
                 </div>
                 <div className="space-y-3 p-4">
-                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {normalizeDisplayDomain(form.destinationUrl) || "yourdomain.com"}
-                  </div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{previewDomain}</div>
                   <div>
-                    <h3 className="text-lg font-semibold">
-                      {form.metaTitle || "Your meta title"}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {form.metaDescription || "Your meta description will appear here."}
-                    </p>
+                    <h3 className="text-lg font-semibold">{form.metaTitle || "Your card title"}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{form.metaDescription || "Your description will appear here."}</p>
                   </div>
                 </div>
               </div>
@@ -548,21 +576,19 @@ export default function MetaLinksPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Meta Short Links</CardTitle>
-              <CardDescription>Manage generated short links and monitor tracked clicks.</CardDescription>
+              <CardTitle>Saved Meta Links</CardTitle>
+              <CardDescription>Reuse any saved Meta Link directly inside the Publish page.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {links.length === 0 ? (
                 <EmptyState
                   icon={Link2}
-                  title="No meta links yet"
-                  description="Create your first tracked short link to start using the meta tag editor."
+                  title="No Meta Links yet"
+                  description="Create your first link card to start building your publishing workflow."
                 />
               ) : (
                 links.map((link) => {
-                  const shortUrl = typeof window === "undefined"
-                    ? `/m/${link.short_code}`
-                    : `${window.location.origin}/m/${link.short_code}`;
+                  const shortUrl = origin ? `${origin}/m/${link.short_code}` : `/m/${link.short_code}`;
 
                   return (
                     <div key={link.id} className="rounded-xl border border-border p-4">
@@ -577,20 +603,15 @@ export default function MetaLinksPage() {
                           <p className="line-clamp-2 text-sm text-muted-foreground">
                             {link.meta_description || "No description added."}
                           </p>
-                          <div className="break-all text-xs text-muted-foreground">
-                            {shortUrl}
-                          </div>
+                          <div className="break-all text-xs text-muted-foreground">{shortUrl}</div>
                           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                             <span>{normalizeDisplayDomain(link.destination_url)}</span>
                             <span>{new Date(link.created_at).toLocaleDateString("en-US")}</span>
+                            <span>{link.click_count || 0} clicks</span>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="gap-1">
-                            <MousePointerClick className="h-3 w-3" />
-                            {link.click_count || 0}
-                          </Badge>
                           <Button variant="outline" size="icon" onClick={() => copyShortLink(link.short_code)}>
                             <Copy className="h-4 w-4" />
                           </Button>
@@ -605,6 +626,15 @@ export default function MetaLinksPage() {
                           </Button>
                         </div>
                       </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => router.push(`/dashboard/create-post?meta=${encodeURIComponent(shortUrl)}`)}>
+                          Use in Post
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => copyShortLink(link.short_code)}>
+                          Copy Link
+                        </Button>
+                      </div>
                     </div>
                   );
                 })
@@ -616,3 +646,4 @@ export default function MetaLinksPage() {
     </div>
   );
 }
+

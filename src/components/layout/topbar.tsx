@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Menu, LogOut, User, Globe, ChevronDown } from "lucide-react";
+import { Menu, LogOut, User, Globe, ChevronDown, Link2, PenSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+
+type FacebookPage = {
+  id: string;
+  page_id: string;
+  page_name: string;
+  is_default: boolean | null;
+};
 
 interface TopbarProps {
   onMenuToggle: () => void;
@@ -14,47 +21,46 @@ interface TopbarProps {
 export function Topbar({ onMenuToggle }: TopbarProps) {
   const router = useRouter();
   const supabase = createClient();
-  const [pages, setPages] = useState<any[]>([]);
-  const [activePage, setActivePage] = useState<any>(null);
+  const [pages, setPages] = useState<FacebookPage[]>([]);
+  const [activePage, setActivePage] = useState<FacebookPage | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
-    loadPages();
-  }, []);
+    async function init() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-  async function loadPages() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+        const { data } = await supabase
+          .from("facebook_pages")
+          .select("id, page_id, page_name, is_default")
+          .eq("user_id", user.id)
+          .order("is_default", { ascending: false });
 
-      const { data } = await supabase
-        .from("facebook_pages")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("is_default", { ascending: false });
-
-      if (data && data.length > 0) {
-        setPages(data);
-        const defaultPage = data.find((p: any) => p.is_default) || data[0];
-        setActivePage(defaultPage);
+        if (data && data.length > 0) {
+          const availablePages = data as FacebookPage[];
+          setPages(availablePages);
+          const defaultPage = availablePages.find((page) => page.is_default) || availablePages[0];
+          setActivePage(defaultPage);
+        }
+      } catch (error) {
+        console.error("Error loading pages:", error);
       }
-    } catch (error) {
-      console.error("Error loading pages:", error);
     }
-  }
 
-  const handleSwitchPage = async (page: any) => {
+    void init();
+  }, [supabase]);
+
+  const handleSwitchPage = async (page: FacebookPage) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Remove default from all
       await supabase
         .from("facebook_pages")
         .update({ is_default: false })
         .eq("user_id", user.id);
 
-      // Set new default
       await supabase
         .from("facebook_pages")
         .update({ is_default: true })
@@ -64,7 +70,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
       setActivePage(page);
       setShowDropdown(false);
       toast.success(`Switched to ${page.page_name}`);
-    } catch (error) {
+    } catch {
       toast.error("Failed to switch page");
     }
   };
@@ -80,7 +86,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-md px-4 lg:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-md lg:px-6">
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
@@ -91,79 +97,70 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
           <Menu className="h-5 w-5" />
         </Button>
 
-        {/* Active Page Switcher */}
         {pages.length > 0 ? (
           <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="flex items-center gap-2.5 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-sm hover:bg-secondary/80 transition-colors cursor-pointer"
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-sm transition-colors hover:bg-secondary/80"
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-500/10 border border-blue-500/20">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md border border-blue-500/20 bg-blue-500/10">
                 <Globe className="h-3.5 w-3.5 text-blue-400" />
               </div>
-              <div className="text-left hidden sm:block">
-                <p className="text-xs font-semibold text-foreground leading-tight">
+              <div className="hidden text-left sm:block">
+                <p className="text-xs font-semibold leading-tight text-foreground">
                   {activePage?.page_name || "Select Page"}
                 </p>
-                <p className="text-[10px] text-muted-foreground leading-tight">
-                  {pages.length} page{pages.length !== 1 ? "s" : ""} connected
+                <p className="text-[10px] leading-tight text-muted-foreground">
+                  Default publishing page
                 </p>
               </div>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
 
-            {/* Dropdown */}
             {showDropdown && (
               <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowDropdown(false)}
-                />
-                <div className="absolute top-full left-0 mt-1.5 z-50 w-64 rounded-xl border border-border bg-card shadow-2xl shadow-black/30 overflow-hidden">
-                  <div className="p-2 border-b border-border">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider px-2 py-1">
-                      Switch Page ({pages.length})
+                <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
+                <div className="absolute left-0 top-full z-50 mt-1.5 w-72 overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-black/30">
+                  <div className="border-b border-border p-2">
+                    <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Switch Default Page
                     </p>
                   </div>
-                  <div className="p-1.5 max-h-64 overflow-y-auto">
-                    {pages.map((page: any) => (
+                  <div className="max-h-64 overflow-y-auto p-1.5">
+                    {pages.map((page) => (
                       <button
                         key={page.id}
                         onClick={() => handleSwitchPage(page)}
-                        className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer ${
+                        className={`w-full cursor-pointer rounded-lg px-3 py-2.5 text-left transition-colors ${
                           activePage?.id === page.id
                             ? "bg-primary/10 text-primary"
-                            : "hover:bg-secondary/50 text-foreground"
+                            : "text-foreground hover:bg-secondary/50"
                         }`}
                       >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-500/10 border border-blue-500/20 flex-shrink-0">
-                          <Globe className="h-4 w-4 text-blue-400" />
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-blue-500/20 bg-blue-500/10">
+                            <Globe className="h-4 w-4 text-blue-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{page.page_name}</p>
+                            <p className="text-[10px] font-mono text-muted-foreground">{page.page_id}</p>
+                          </div>
+                          {activePage?.id === page.id && (
+                            <span className="ml-auto text-[10px] font-semibold text-primary">Active</span>
+                          )}
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {page.page_name}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground font-mono">
-                            {page.page_id}
-                          </p>
-                        </div>
-                        {activePage?.id === page.id && (
-                          <span className="ml-auto text-[10px] font-semibold text-primary">
-                            Active
-                          </span>
-                        )}
                       </button>
                     ))}
                   </div>
-                  <div className="p-2 border-t border-border">
+                  <div className="border-t border-border p-2">
                     <button
                       onClick={() => {
                         setShowDropdown(false);
                         router.push("/dashboard/facebook-pages");
                       }}
-                      className="w-full text-center text-xs text-muted-foreground hover:text-primary py-1.5 transition-colors cursor-pointer"
+                      className="w-full cursor-pointer py-1.5 text-center text-xs text-muted-foreground transition-colors hover:text-primary"
                     >
-                      Manage Pages →
+                      Manage Pages ?
                     </button>
                   </div>
                 </div>
@@ -174,7 +171,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 text-muted-foreground text-xs"
+            className="gap-1.5 text-xs text-muted-foreground"
             onClick={() => router.push("/dashboard/facebook-pages")}
           >
             <Globe className="h-3.5 w-3.5" />
@@ -185,11 +182,23 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
 
       <div className="flex items-center gap-2">
         <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 rounded-full"
-          title="Profile"
+          variant="outline"
+          size="sm"
+          className="hidden gap-2 md:inline-flex"
+          onClick={() => router.push("/dashboard/meta-links")}
         >
+          <Link2 className="h-4 w-4" />
+          New Meta Link
+        </Button>
+        <Button
+          size="sm"
+          className="hidden gap-2 md:inline-flex"
+          onClick={() => router.push("/dashboard/create-post")}
+        >
+          <PenSquare className="h-4 w-4" />
+          Publish Post
+        </Button>
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" title="Profile">
           <User className="h-4 w-4" />
         </Button>
         <Button
