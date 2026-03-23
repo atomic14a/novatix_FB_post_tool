@@ -1,11 +1,9 @@
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createJsonResponse, getExtensionUserFromRequest } from "@/lib/extension/auth";
+import { createJsonResponse, getExtensionContextFromRequest } from "@/lib/extension/auth";
 
 export async function POST(request: Request) {
   try {
-    const user = await getExtensionUserFromRequest(request);
+    const { user, supabase } = await getExtensionContextFromRequest(request);
     const body = await request.json();
-    const admin = createAdminClient();
 
     const payload = {
       user_id: user.id,
@@ -21,24 +19,28 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
-    const existing = await admin
+    let existingQuery = supabase
       .from("extension_facebook_contexts")
       .select("id")
       .eq("user_id", user.id)
-      .eq("session_id", body.session_id || null)
       .order("updated_at", { ascending: false })
       .limit(1);
 
+    existingQuery = body.session_id
+      ? existingQuery.eq("session_id", body.session_id)
+      : existingQuery.is("session_id", null);
+
+    const existing = await existingQuery;
     if (existing.error) throw existing.error;
 
     const query = existing.data && existing.data[0]?.id
-      ? admin.from("extension_facebook_contexts").update(payload).eq("id", existing.data[0].id)
-      : admin.from("extension_facebook_contexts").insert(payload);
+      ? supabase.from("extension_facebook_contexts").update(payload).eq("id", existing.data[0].id)
+      : supabase.from("extension_facebook_contexts").insert(payload);
 
     const { data, error } = await query.select().single();
     if (error) throw error;
 
-    await admin.from("extension_logs").insert({
+    await supabase.from("extension_logs").insert({
       user_id: user.id,
       session_id: body.session_id || null,
       log_type: "facebook_context_sync",

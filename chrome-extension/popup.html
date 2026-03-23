@@ -12,28 +12,53 @@
         <div>
           <p class="eyebrow">Novatix</p>
           <h1>Extension Lab</h1>
+          <p class="hero-copy">Connect your browser with the same website account and run extension jobs safely.</p>
         </div>
         <span id="connection-badge" class="badge muted">Disconnected</span>
       </header>
 
-      <section class="panel">
-        <h2>User Account</h2>
-        <div id="account-info" class="subtext">Log in to connect the extension with your website account.</div>
-        <div class="grid two">
-          <input id="email" type="email" placeholder="Email" />
-          <input id="password" type="password" placeholder="Password" />
+      <section class="panel account-panel">
+        <div class="panel-head">
+          <div>
+            <h2>User Account</h2>
+            <div id="account-info" class="subtext">Use your existing website session or sign in directly here.</div>
+          </div>
+          <div id="mini-status" class="mini-status">Idle</div>
         </div>
-        <div class="actions">
+
+        <div id="status-banner" class="status-banner hidden"></div>
+
+        <div class="website-login-card">
+          <div>
+            <p class="label">Quickest option</p>
+            <p class="helper">If the Novatix website is already logged in in Chrome, connect the extension with one click.</p>
+          </div>
+          <button id="website-login-btn" class="secondary wide">Use Website Login</button>
+        </div>
+
+        <div class="divider"><span>or sign in directly</span></div>
+
+        <div class="field-group">
+          <label class="label" for="email">Email</label>
+          <input id="email" type="email" placeholder="name@example.com" autocomplete="username" />
+        </div>
+
+        <div class="field-group">
+          <label class="label" for="password">Password</label>
+          <input id="password" type="password" placeholder="Enter your password" autocomplete="current-password" />
+        </div>
+
+        <div class="actions grid-actions">
           <button id="login-btn" class="primary">Login</button>
-          <button id="logout-btn" class="ghost">Logout</button>
           <button id="reconnect-btn" class="ghost">Reconnect</button>
+          <button id="logout-btn" class="ghost">Logout</button>
         </div>
       </section>
 
       <section class="panel">
         <h2>Website Sync</h2>
         <div id="sync-info" class="subtext">Waiting for extension login.</div>
-        <div class="actions">
+        <div class="actions grid-actions">
           <button id="open-dashboard-btn" class="ghost">Open Dashboard</button>
           <button id="open-module-btn" class="ghost">Open Extension Module</button>
         </div>
@@ -43,7 +68,7 @@
         <h2>Facebook Detection</h2>
         <div id="facebook-info" class="subtext">No Facebook context synced yet.</div>
         <div class="actions">
-          <button id="detect-facebook-btn" class="ghost">Sync Facebook</button>
+          <button id="detect-facebook-btn" class="ghost wide">Sync Facebook</button>
         </div>
       </section>
 
@@ -51,9 +76,9 @@
         <h2>Job Queue</h2>
         <div id="job-stats" class="subtext">No jobs fetched yet.</div>
         <div id="current-job" class="job-card empty">No current job assigned.</div>
-        <div class="actions">
+        <div class="actions grid-actions">
           <button id="refresh-jobs-btn" class="ghost">Refresh Jobs</button>
-          <button id="run-job-btn" class="primary">Retry Last Job</button>
+          <button id="run-job-btn" class="primary">Run Current Job</button>
         </div>
       </section>
 

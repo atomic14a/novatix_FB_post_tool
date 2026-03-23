@@ -1,5 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createJsonResponse, getExtensionUserFromRequest } from "@/lib/extension/auth";
+import { createJsonResponse, getExtensionContextFromRequest } from "@/lib/extension/auth";
 
 export async function PATCH(
   request: Request,
@@ -7,9 +6,8 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const user = await getExtensionUserFromRequest(request);
+    const { user, supabase } = await getExtensionContextFromRequest(request);
     const body = await request.json();
-    const admin = createAdminClient();
 
     const updatePayload: Record<string, unknown> = {
       status: body.status,
@@ -21,11 +19,11 @@ export async function PATCH(
       updatePayload.started_at = new Date().toISOString();
     }
 
-    if (body.status === "completed" || body.status === "failed" || body.status === "cancelled") {
+    if (["completed", "failed", "cancelled"].includes(body.status)) {
       updatePayload.completed_at = new Date().toISOString();
     }
 
-    const { data, error } = await admin
+    const { data, error } = await supabase
       .from("extension_jobs")
       .update(updatePayload)
       .eq("id", id)
@@ -35,7 +33,7 @@ export async function PATCH(
 
     if (error) throw error;
 
-    await admin.from("extension_logs").insert({
+    await supabase.from("extension_logs").insert({
       user_id: user.id,
       session_id: body.session_id || null,
       log_type: "job_status",

@@ -1,6 +1,6 @@
 import { APP_URL, EXTENSION_VERSION, POLL_INTERVAL } from "./config.js";
 
-const state = {
+const initialState = {
   session: null,
   config: null,
   extensionSession: null,
@@ -9,22 +9,68 @@ const state = {
   lastActivity: [],
 };
 
+const state = { ...initialState };
+
 function logActivity(message, metadata = {}) {
   const item = { message, metadata, at: new Date().toISOString() };
   state.lastActivity = [item, ...state.lastActivity].slice(0, 10);
   chrome.storage.local.set({ novatix_state: state });
 }
 
+async function persistState() {
+  await chrome.storage.local.set({ novatix_state: state });
+}
+
+async function hydrateState() {
+  const stored = await chrome.storage.local.get("novatix_state");
+  if (stored.novatix_state) {
+    Object.assign(state, stored.novatix_state);
+  }
+}
+
 async function fetchConfig() {
   const response = await fetch(`${APP_URL}/api/extension/config`);
   const data = await response.json();
   state.config = data;
-  await chrome.storage.local.set({ novatix_state: state });
+  await persistState();
   return data;
 }
 
+async function fetchWebsiteSession() {
+  const response = await fetch(`${APP_URL}/api/extension/website-session`, {
+    credentials: "include",
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Failed to check website session");
+  }
+
+  if (!data.session?.access_token || !data.session?.refresh_token) {
+    return null;
+  }
+
+  state.session = data.session;
+  await persistState();
+  logActivity("Connected using website session", { email: data.user?.email || null });
+  await syncSession(true);
+  return data.session;
+}
+
+async function ensureConfig() {
+  return state.config || fetchConfig();
+}
+
+async function ensureSession() {
+  if (state.session?.access_token) {
+    return state.session;
+  }
+
+  return fetchWebsiteSession().catch(() => null);
+}
+
 async function signIn(email, password) {
-  const config = state.config || (await fetchConfig());
+  const config = await ensureConfig();
   const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=password`, {
     method: "POST",
     headers: {
@@ -40,7 +86,7 @@ async function signIn(email, password) {
   }
 
   state.session = data;
-  await chrome.storage.local.set({ novatix_state: state });
+  await persistState();
   logActivity("Logged in from extension", { email });
   await syncSession(true);
   await openWebsiteBridge();
@@ -63,7 +109,7 @@ async function signOut() {
   state.extensionSession = null;
   state.currentJob = null;
   logActivity("Logged out from extension");
-  await chrome.storage.local.set({ novatix_state: state });
+  await persistState();
 }
 
 function getAuthHeaders() {
@@ -88,7 +134,8 @@ function getDeviceFingerprint() {
 }
 
 async function syncSession(isOnline = true) {
-  if (!state.session?.access_token) {
+  const session = await ensureSession();
+  if (!session?.access_token) {
     return null;
   }
 
@@ -107,7 +154,7 @@ async function syncSession(isOnline = true) {
   }
 
   state.extensionSession = data.session;
-  await chrome.storage.local.set({ novatix_state: state });
+  await persistState();
   logActivity(isOnline ? "Website sync successful" : "Extension disconnected");
   return data.session;
 }
@@ -129,7 +176,8 @@ async function openDashboard(path = "/dashboard/extension") {
 }
 
 async function fetchJobs() {
-  if (!state.session?.access_token) {
+  const session = await ensureSession();
+  if (!session?.access_token) {
     return null;
   }
 
@@ -143,7 +191,7 @@ async function fetchJobs() {
   }
 
   state.currentJob = data.job || null;
-  await chrome.storage.local.set({ novatix_state: state });
+  await persistState();
 
   if (data.job) {
     logActivity("Job fetched", { job_id: data.job.id, job_type: data.job.job_type });
@@ -248,7 +296,7 @@ async function executeCurrentJob() {
     logActivity("Publish completed", { job_id: job.id });
     state.stats.completed += 1;
     state.currentJob = null;
-    await chrome.storage.local.set({ novatix_state: state });
+    await persistState();
     return resultPayload;
   } catch (error) {
     await createResult(job.id, {
@@ -261,28 +309,48 @@ async function executeCurrentJob() {
     logActivity("Publish failed", { job_id: job.id, error: error instanceof Error ? error.message : "Execution failed" });
     state.stats.failed += 1;
     state.currentJob = null;
-    await chrome.storage.local.set({ novatix_state: state });
+    await persistState();
     throw error;
   }
+}
+
+async function bootstrap() {
+  await hydrateState();
+  await ensureConfig();
+  if (!state.session?.access_token) {
+    await fetchWebsiteSession().catch(() => undefined);
+  }
+  await persistState();
 }
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({ novatix_state: state });
 });
 
+chrome.runtime.onStartup.addListener(() => {
+  void bootstrap();
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     try {
       if (message.type === "NOVATIX_POPUP_INIT") {
-        if (!state.config) {
-          await fetchConfig();
-        }
+        await bootstrap();
         sendResponse({ ok: true, state });
         return;
       }
 
       if (message.type === "NOVATIX_LOGIN") {
         const data = await signIn(message.email, message.password);
+        sendResponse({ ok: true, data, state });
+        return;
+      }
+
+      if (message.type === "NOVATIX_USE_WEBSITE_LOGIN") {
+        const data = await fetchWebsiteSession();
+        if (!data) {
+          throw new Error("No logged-in website session was found in this browser.");
+        }
         sendResponse({ ok: true, data, state });
         return;
       }

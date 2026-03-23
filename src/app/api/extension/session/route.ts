@@ -1,11 +1,9 @@
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getExtensionUserFromRequest, createJsonResponse } from "@/lib/extension/auth";
+import { createJsonResponse, getExtensionContextFromRequest } from "@/lib/extension/auth";
 
 export async function POST(request: Request) {
   try {
-    const user = await getExtensionUserFromRequest(request);
+    const { user, supabase } = await getExtensionContextFromRequest(request);
     const body = await request.json();
-    const admin = createAdminClient();
 
     const payload = {
       user_id: user.id,
@@ -19,7 +17,7 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await admin
+    const { data, error } = await supabase
       .from("extension_sessions")
       .upsert(payload, { onConflict: "user_id,device_id,browser_id" })
       .select()
@@ -29,7 +27,7 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    await admin.from("extension_logs").insert({
+    await supabase.from("extension_logs").insert({
       user_id: user.id,
       session_id: data.id,
       log_type: "session_sync",

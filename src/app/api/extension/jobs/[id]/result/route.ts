@@ -1,5 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createJsonResponse, getExtensionUserFromRequest } from "@/lib/extension/auth";
+import { createJsonResponse, getExtensionContextFromRequest } from "@/lib/extension/auth";
 
 export async function POST(
   request: Request,
@@ -7,11 +6,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const user = await getExtensionUserFromRequest(request);
+    const { user, supabase } = await getExtensionContextFromRequest(request);
     const body = await request.json();
-    const admin = createAdminClient();
 
-    const { data, error } = await admin
+    const { data, error } = await supabase
       .from("extension_job_results")
       .insert({
         job_id: id,

@@ -1,14 +1,12 @@
-import { createAdminClient } from "@/lib/supabase/admin";
-import { createJsonResponse, getExtensionUserFromRequest } from "@/lib/extension/auth";
+import { createJsonResponse, getExtensionContextFromRequest } from "@/lib/extension/auth";
 
 export async function GET(request: Request) {
   try {
-    const user = await getExtensionUserFromRequest(request);
-    const admin = createAdminClient();
+    const { user, supabase } = await getExtensionContextFromRequest(request);
     const url = new URL(request.url);
     const sessionId = url.searchParams.get("session_id");
 
-    let query = admin
+    let query = supabase
       .from("extension_jobs")
       .select("*")
       .eq("user_id", user.id)
@@ -38,13 +36,9 @@ export async function GET(request: Request) {
     }
 
     if (job.status === "pending") {
-      await admin
-        .from("extension_jobs")
-        .update(updatePayload)
-        .eq("id", job.id)
-        .eq("user_id", user.id);
+      await supabase.from("extension_jobs").update(updatePayload).eq("id", job.id).eq("user_id", user.id);
 
-      await admin.from("extension_logs").insert({
+      await supabase.from("extension_logs").insert({
         user_id: user.id,
         session_id: sessionId,
         log_type: "job_assigned",
@@ -64,8 +58,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await getExtensionUserFromRequest(request);
-    const admin = createAdminClient();
+    const { user, supabase } = await getExtensionContextFromRequest(request);
     const body = await request.json();
 
     const payload = {
@@ -79,15 +72,10 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await admin
-      .from("extension_jobs")
-      .insert(payload)
-      .select()
-      .single();
-
+    const { data, error } = await supabase.from("extension_jobs").insert(payload).select().single();
     if (error) throw error;
 
-    await admin.from("extension_logs").insert({
+    await supabase.from("extension_logs").insert({
       user_id: user.id,
       log_type: "job_created",
       message: `Job ${data.id} created from extension endpoint`,
