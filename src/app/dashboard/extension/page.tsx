@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { ExtensionNav } from "@/components/extension/extension-nav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,43 +29,62 @@ type ExtensionContext = {
   synced_at: string;
 };
 
+const REFRESH_MS = 10000;
+
 export default function ExtensionHubPage() {
   const supabase = createClient();
   const [session, setSession] = useState<ExtensionSession | null>(null);
   const [context, setContext] = useState<ExtensionContext | null>(null);
   const [userEmail, setUserEmail] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    setUserEmail(user.email || "");
+
+    const [sessionRes, contextRes] = await Promise.all([
+      supabase
+        .from("extension_sessions")
+        .select("id, browser_name, platform, extension_version, is_online, last_seen, updated_at")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("extension_facebook_contexts")
+        .select("account_name, page_name, page_id, facebook_detected, facebook_logged_in, synced_at")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    setSession((sessionRes.data as ExtensionSession | null) || null);
+    setContext((contextRes.data as ExtensionContext | null) || null);
+    setLoading(false);
+  }, [supabase]);
 
   useEffect(() => {
-    async function loadData() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserEmail(user.email || "");
+    const timeout = window.setTimeout(() => {
+      void loadData();
+    }, 0);
 
-      const [sessionRes, contextRes] = await Promise.all([
-        supabase
-          .from("extension_sessions")
-          .select("id, browser_name, platform, extension_version, is_online, last_seen, updated_at")
-          .eq("user_id", user.id)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("extension_facebook_contexts")
-          .select("account_name, page_name, page_id, facebook_detected, facebook_logged_in, synced_at")
-          .eq("user_id", user.id)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
+    const interval = window.setInterval(() => {
+      void loadData();
+    }, REFRESH_MS);
 
-      setSession((sessionRes.data as ExtensionSession | null) || null);
-      setContext((contextRes.data as ExtensionContext | null) || null);
-    }
-
-    void loadData();
-  }, [supabase]);
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+    };
+  }, [loadData]);
 
   const online = session?.is_online;
 
@@ -75,10 +94,16 @@ export default function ExtensionHubPage() {
         title="Extension Hub"
         description="Manage the new browser-extension system without affecting your current publishing flow or the old app-based page connection flow."
       >
-        <Button onClick={() => window.open(EXTENSION_ROUTES.post, "_self")} className="gap-2">
-          <Cable className="h-4 w-4" />
-          Open Extension Post
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => void loadData()} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Refresh Status
+          </Button>
+          <Button onClick={() => window.open(EXTENSION_ROUTES.post, "_self")} className="gap-2">
+            <Cable className="h-4 w-4" />
+            Open Extension Post
+          </Button>
+        </div>
       </PageHeader>
 
       <ExtensionNav />
@@ -99,12 +124,12 @@ export default function ExtensionHubPage() {
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Extension Status</p>
               <div className="mt-2 flex items-center gap-2">
                 <Badge variant={online ? "success" : "secondary"}>{online ? "Online" : "Offline"}</Badge>
-                <span className="text-sm text-muted-foreground">{session ? "Extension session found" : "No extension session yet"}</span>
+                <span className="text-sm text-muted-foreground">{session ? "Extension session found" : loading ? "Checking extension session..." : "No extension session yet"}</span>
               </div>
             </div>
             <div className="rounded-xl border border-border p-4">
               <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Browser / Device</p>
-              <p className="mt-2 font-semibold">{session?.browser_name || "Waiting for extension"}</p>
+              <p className="mt-2 font-semibold">{session?.browser_name || (loading ? "Checking..." : "Waiting for extension")}</p>
               <p className="mt-1 text-sm text-muted-foreground">{session?.platform || "Unknown platform"}</p>
             </div>
             <div className="rounded-xl border border-border p-4">
@@ -118,7 +143,7 @@ export default function ExtensionHubPage() {
         <Card>
           <CardHeader>
             <CardTitle>Detected Facebook Context</CardTitle>
-            <CardDescription>Auto-detected from the Facebook tab through the extension, without touching the old page-connect flow.</CardDescription>
+            <CardDescription>Auto-detected from any Facebook tab in Chrome, without touching the old page-connect flow.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3">
@@ -126,14 +151,14 @@ export default function ExtensionHubPage() {
                 <UserRound className="h-4 w-4 text-primary" />
                 <div>
                   <p className="text-sm font-medium">Facebook Account</p>
-                  <p className="text-xs text-muted-foreground">{context?.account_name || "Not detected yet"}</p>
+                  <p className="text-xs text-muted-foreground">{context?.account_name || (loading ? "Checking..." : "Not detected yet")}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 rounded-xl border border-border p-3">
                 <Flag className="h-4 w-4 text-primary" />
                 <div>
                   <p className="text-sm font-medium">Current Facebook Page</p>
-                  <p className="text-xs text-muted-foreground">{context?.page_name || "No page detected yet"}</p>
+                  <p className="text-xs text-muted-foreground">{context?.page_name || (loading ? "Checking..." : "No page detected yet")}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 rounded-xl border border-border p-3">

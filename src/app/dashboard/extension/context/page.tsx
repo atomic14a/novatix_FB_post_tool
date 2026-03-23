@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { ExtensionNav } from "@/components/extension/extension-nav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { RefreshCw } from "lucide-react";
 
 type ExtensionContext = {
   id: string;
@@ -19,30 +21,58 @@ type ExtensionContext = {
   context_data: Record<string, unknown>;
 };
 
+const REFRESH_MS = 10000;
+
 export default function ExtensionContextPage() {
   const supabase = createClient();
   const [context, setContext] = useState<ExtensionContext | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadContext() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("extension_facebook_contexts")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setContext((data as ExtensionContext | null) || null);
+  const loadContext = useCallback(async () => {
+    setLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
     }
 
-    void loadContext();
+    const { data } = await supabase
+      .from("extension_facebook_contexts")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    setContext((data as ExtensionContext | null) || null);
+    setLoading(false);
   }, [supabase]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void loadContext();
+    }, 0);
+
+    const interval = window.setInterval(() => {
+      void loadContext();
+    }, REFRESH_MS);
+
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+    };
+  }, [loadContext]);
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Facebook Context" description="Latest browser-side Facebook environment detected by the extension." />
+      <PageHeader title="Facebook Context" description="Latest browser-side Facebook environment detected by the extension.">
+        <Button variant="outline" onClick={() => void loadContext()} className="gap-2">
+          <RefreshCw className="h-4 w-4" />
+          Refresh Context
+        </Button>
+      </PageHeader>
       <ExtensionNav />
       <Card>
         <CardHeader>
@@ -51,7 +81,7 @@ export default function ExtensionContextPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {!context ? (
-            <p className="text-sm text-muted-foreground">No Facebook context synced yet.</p>
+            <p className="text-sm text-muted-foreground">{loading ? "Checking Facebook context..." : "No Facebook context synced yet."}</p>
           ) : (
             <>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">

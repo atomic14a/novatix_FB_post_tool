@@ -7,6 +7,7 @@ const initialState = {
   currentJob: null,
   stats: { pending: 0, completed: 0, failed: 0 },
   lastActivity: [],
+  facebookContext: null,
 };
 
 const state = { ...initialState };
@@ -89,6 +90,7 @@ async function signIn(email, password) {
   await persistState();
   logActivity("Logged in from extension", { email });
   await syncSession(true);
+  await autoSyncFacebookContext();
   await openWebsiteBridge();
   return data;
 }
@@ -108,6 +110,7 @@ async function signOut() {
   state.session = null;
   state.extensionSession = null;
   state.currentJob = null;
+  state.facebookContext = null;
   logActivity("Logged out from extension");
   await persistState();
 }
@@ -236,32 +239,85 @@ async function syncFacebookContext(contextPayload) {
       ...contextPayload,
     }),
   });
+
+  state.facebookContext = contextPayload;
+  await persistState();
+}
+
+function isFacebookUrl(url) {
+  return typeof url === "string" && url.includes("facebook.com");
+}
+
+async function findFacebookTab() {
+  const tabs = await chrome.tabs.query({});
+  const facebookTabs = tabs.filter((tab) => isFacebookUrl(tab.url));
+  if (!facebookTabs.length) return null;
+
+  const activeFacebookTab = facebookTabs.find((tab) => tab.active && tab.windowId === chrome.windows.WINDOW_ID_CURRENT);
+  return activeFacebookTab || facebookTabs[0] || null;
+}
+
+async function readFacebookContextFromTab(tabId) {
+  const messageResult = await chrome.tabs.sendMessage(tabId, { type: "NOVATIX_DETECT_FACEBOOK" }).catch(() => null);
+  if (messageResult) {
+    return messageResult;
+  }
+
+  const injected = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => {
+      const extractPageId = (url) => {
+        const match = url.match(/facebook\.com\/(?:profile\.php\?id=)?([^/?&]+)/i);
+        return match ? match[1] : null;
+      };
+
+      const title = document.title || "";
+      const metaTitle = document.querySelector("meta[property='og:title']")?.getAttribute("content") || null;
+      const heading = document.querySelector("h1")?.textContent?.trim() || null;
+      const candidateName = heading || metaTitle || title || null;
+
+      return {
+        facebook_detected: true,
+        facebook_logged_in: !title.toLowerCase().includes("log in") && !title.toLowerCase().includes("login"),
+        account_name: candidateName,
+        page_name: heading || title || candidateName,
+        page_id: extractPageId(window.location.href),
+        detected_pages_count: 1,
+        context_data: {
+          url: window.location.href,
+          title,
+          referrer: document.referrer || null,
+        },
+      };
+    },
+  }).catch(() => null);
+
+  return injected?.[0]?.result || null;
 }
 
 async function detectFacebookContext() {
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  const activeTab = tabs[0];
+  const facebookTab = await findFacebookTab();
 
-  if (!activeTab?.id || !activeTab.url?.includes("facebook.com")) {
-    const fallback = {
-      facebook_detected: false,
-      facebook_logged_in: false,
-      account_name: null,
-      page_name: null,
-      page_id: null,
-      detected_pages_count: 0,
-      context_data: { active_url: activeTab?.url || null },
-    };
-    await syncFacebookContext(fallback).catch(() => undefined);
-    return fallback;
+  if (!facebookTab?.id) {
+    return state.facebookContext || null;
   }
 
-  const result = await chrome.tabs.sendMessage(activeTab.id, { type: "NOVATIX_DETECT_FACEBOOK" }).catch(() => null);
+  const result = await readFacebookContextFromTab(facebookTab.id);
   if (result) {
     await syncFacebookContext(result).catch(() => undefined);
-    logActivity("Facebook context synced", result);
+    logActivity("Facebook context synced", {
+      account_name: result.account_name || null,
+      page_name: result.page_name || null,
+      page_id: result.page_id || null,
+      source_tab_id: facebookTab.id,
+    });
   }
   return result;
+}
+
+async function autoSyncFacebookContext() {
+  if (!state.session?.access_token) return null;
+  return detectFacebookContext().catch(() => null);
 }
 
 async function executeCurrentJob() {
@@ -320,6 +376,7 @@ async function bootstrap() {
   if (!state.session?.access_token) {
     await fetchWebsiteSession().catch(() => undefined);
   }
+  await autoSyncFacebookContext();
   await persistState();
 }
 
@@ -329,6 +386,16 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.runtime.onStartup.addListener(() => {
   void bootstrap();
+});
+
+chrome.tabs.onActivated.addListener(() => {
+  void autoSyncFacebookContext();
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete" && isFacebookUrl(tab.url)) {
+    void autoSyncFacebookContext();
+  }
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -351,6 +418,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (!data) {
           throw new Error("No logged-in website session was found in this browser.");
         }
+        await autoSyncFacebookContext();
         sendResponse({ ok: true, data, state });
         return;
       }
@@ -363,6 +431,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       if (message.type === "NOVATIX_SYNC") {
         await syncSession(true);
+        await autoSyncFacebookContext();
         sendResponse({ ok: true, state });
         return;
       }
@@ -402,5 +471,6 @@ setInterval(() => {
   if (state.session?.access_token) {
     syncSession(true).catch(() => undefined);
     fetchJobs().catch(() => undefined);
+    autoSyncFacebookContext().catch(() => undefined);
   }
 }, POLL_INTERVAL);

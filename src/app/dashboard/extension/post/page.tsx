@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { ExtensionNav } from "@/components/extension/extension-nav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Flag, Loader2, Send, UserRound } from "lucide-react";
+import { Flag, Loader2, RefreshCw, Send, UserRound } from "lucide-react";
 
 type FacebookPage = {
   id: string;
@@ -38,6 +38,7 @@ type ExtensionJob = {
 };
 
 const CTA_OPTIONS = ["Learn More", "Shop Now", "Sign Up", "Contact Us", "Apply Now"];
+const REFRESH_MS = 10000;
 
 export default function ExtensionPostPage() {
   const supabase = createClient();
@@ -51,47 +52,58 @@ export default function ExtensionPostPage() {
   const [mediaUrl, setMediaUrl] = useState("");
   const [cta, setCta] = useState("Learn More");
   const [submitting, setSubmitting] = useState(false);
+  const [loadingContext, setLoadingContext] = useState(true);
 
-  useEffect(() => {
-    async function loadData() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const [pagesRes, contextRes, jobsRes] = await Promise.all([
-        supabase
-          .from("facebook_pages")
-          .select("id, page_name, page_id, is_default")
-          .eq("user_id", user.id)
-          .order("is_default", { ascending: false }),
-        supabase
-          .from("extension_facebook_contexts")
-          .select("account_name, page_name, page_id, facebook_detected, facebook_logged_in, synced_at")
-          .eq("user_id", user.id)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("extension_jobs")
-          .select("id, status, created_at, payload")
-          .eq("user_id", user.id)
-          .eq("job_type", "extension_publish_post")
-          .order("created_at", { ascending: false })
-          .limit(5),
-      ]);
-
-      const availablePages = (pagesRes.data || []) as FacebookPage[];
-      const defaultPage = availablePages.find((page) => page.is_default) || availablePages[0];
-
-      setPages(availablePages);
-      setContext((contextRes.data as ExtensionContext | null) || null);
-      setRecentJobs((jobsRes.data || []) as ExtensionJob[]);
-      setSelectedPage((current) => current || defaultPage?.id || "");
+  const loadData = useCallback(async () => {
+    setLoadingContext(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setLoadingContext(false);
+      return;
     }
 
-    void loadData();
+    const [pagesRes, contextRes, jobsRes] = await Promise.all([
+      supabase
+        .from("facebook_pages")
+        .select("id, page_name, page_id, is_default")
+        .eq("user_id", user.id)
+        .order("is_default", { ascending: false }),
+      supabase
+        .from("extension_facebook_contexts")
+        .select("account_name, page_name, page_id, facebook_detected, facebook_logged_in, synced_at")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("extension_jobs")
+        .select("id, status, created_at, payload")
+        .eq("user_id", user.id)
+        .eq("job_type", "extension_publish_post")
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
+
+    const availablePages = (pagesRes.data || []) as FacebookPage[];
+    const defaultPage = availablePages.find((page) => page.is_default) || availablePages[0];
+
+    setPages(availablePages);
+    setContext((contextRes.data as ExtensionContext | null) || null);
+    setRecentJobs((jobsRes.data || []) as ExtensionJob[]);
+    setSelectedPage((current) => current || defaultPage?.id || "");
+    setLoadingContext(false);
   }, [supabase]);
+
+  useEffect(() => {
+    void loadData();
+    const interval = window.setInterval(() => {
+      void loadData();
+    }, REFRESH_MS);
+
+    return () => window.clearInterval(interval);
+  }, [loadData]);
 
   const selectedPageData = useMemo(() => pages.find((page) => page.id === selectedPage) || null, [pages, selectedPage]);
 
@@ -138,16 +150,7 @@ export default function ExtensionPostPage() {
       setMessage("");
       setDestinationUrl("");
       setMediaUrl("");
-
-      const { data } = await supabase
-        .from("extension_jobs")
-        .select("id, status, created_at, payload")
-        .eq("user_id", user.id)
-        .eq("job_type", "extension_publish_post")
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      setRecentJobs((data || []) as ExtensionJob[]);
+      await loadData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to queue extension post");
     } finally {
@@ -161,10 +164,16 @@ export default function ExtensionPostPage() {
         title="Extension Post"
         description="This is a separate extension-only posting flow. It does not change your old publish page or your old app-based page connection flow."
       >
-        <Button onClick={handleQueuePost} disabled={submitting} className="gap-2">
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Queue Extension Post
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => void loadData()} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Refresh Status
+          </Button>
+          <Button onClick={handleQueuePost} disabled={submitting} className="gap-2">
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Queue Extension Post
+          </Button>
+        </div>
       </PageHeader>
 
       <ExtensionNav />
@@ -173,7 +182,7 @@ export default function ExtensionPostPage() {
         <Card>
           <CardHeader>
             <CardTitle>Detected Facebook Session</CardTitle>
-            <CardDescription>The extension should keep this in sync from the Facebook tab automatically.</CardDescription>
+            <CardDescription>The extension keeps this in sync from any Facebook tab it can see in Chrome.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border border-border p-4">
@@ -181,7 +190,7 @@ export default function ExtensionPostPage() {
                 <UserRound className="h-4 w-4 text-primary" />
                 <div>
                   <p className="text-sm font-medium">Facebook Account</p>
-                  <p className="text-xs text-muted-foreground">{context?.account_name || "Not detected yet"}</p>
+                  <p className="text-xs text-muted-foreground">{context?.account_name || (loadingContext ? "Checking..." : "Not detected yet")}</p>
                 </div>
               </div>
             </div>
@@ -190,7 +199,7 @@ export default function ExtensionPostPage() {
                 <Flag className="h-4 w-4 text-primary" />
                 <div>
                   <p className="text-sm font-medium">Current Facebook Page</p>
-                  <p className="text-xs text-muted-foreground">{context?.page_name || "No page detected yet"}</p>
+                  <p className="text-xs text-muted-foreground">{context?.page_name || (loadingContext ? "Checking..." : "No page detected yet")}</p>
                 </div>
               </div>
             </div>
