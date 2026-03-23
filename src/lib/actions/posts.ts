@@ -244,6 +244,30 @@ export async function createPost(formData: {
   return newPost;
 }
 
+export async function createBoostPost(formData: {
+  facebook_page_id?: string;
+  title: string;
+  short_text?: string;
+  card_description?: string;
+  destination_url?: string;
+  cta?: string;
+  media_url?: string;
+  media_type?: string;
+  is_fake_video?: boolean;
+  fake_video_duration?: string;
+  status: "draft" | "published";
+}) {
+  try {
+    const post = await createPost(formData);
+    return { success: true, post };
+  } catch (error) {
+    console.error("Boost post create failed:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Boost Post failed to publish.",
+    };
+  }
+}
 export async function updatePost(
   id: string,
   formData: Partial<{
@@ -328,3 +352,4 @@ export async function deletePost(id: string) {
   const { error } = await supabase.from("posts").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw error;
 }
+

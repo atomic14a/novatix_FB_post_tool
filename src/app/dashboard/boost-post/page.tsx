@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
-import { createPost } from "@/lib/actions/posts";
+import { createBoostPost } from "@/lib/actions/posts";
 import {
   CheckCircle2,
   Clock3,
@@ -229,7 +229,7 @@ export default function BoostPostPage() {
       const uploadedUrl = item.uploadedUrl || (await uploadImage(item));
       updateItem(item.id, { status: "publishing", progress: 70 });
 
-      const created = await createPost({
+      const result = await createBoostPost({
         facebook_page_id: selectedPage || undefined,
         title: headline.trim() || item.label,
         short_text: message.trim() || undefined,
@@ -240,10 +240,14 @@ export default function BoostPostPage() {
         status: "published",
       });
 
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
       updateItem(item.id, {
         status: "published",
         progress: 100,
-        postId: created?.id || null,
+        postId: result.post?.id || null,
       });
     } catch (error) {
       console.error("Boost item failed:", error);
@@ -570,3 +574,5 @@ export default function BoostPostPage() {
     </div>
   );
 }
+
+
