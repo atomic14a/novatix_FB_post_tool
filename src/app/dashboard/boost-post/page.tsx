@@ -299,6 +299,16 @@ export default function BoostPostPage() {
     [queue]
   );
 
+  const setupIssues = useMemo(() => {
+    const issues: string[] = [];
+    if (!selectedPage) issues.push("Select a Facebook Page");
+    if (!sharedUrl.trim()) issues.push("Add the shared website URL");
+    if (queue.length === 0) issues.push("Upload at least one image");
+    return issues;
+  }, [queue.length, selectedPage, sharedUrl]);
+
+  const canRun = setupIssues.length === 0;
+
   if (loading) {
     return <BoostPostLoading />;
   }
@@ -309,9 +319,9 @@ export default function BoostPostPage() {
         title="Boost Post"
         description="Upload one or many images, attach one shared URL and CTA, then run a safe isolated publishing queue."
       >
-        <Button className="gap-2" onClick={handleRun} disabled={running}>
+        <Button className="gap-2" onClick={handleRun} disabled={running || !canRun}>
           {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
-          Start Boost Publish
+          {running ? "Running Queue" : "Start Boost Publish"}
         </Button>
       </PageHeader>
 
@@ -356,6 +366,30 @@ export default function BoostPostPage() {
 
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1.08fr_0.92fr]">
         <div className="space-y-6">
+          <Card className={canRun ? "border-emerald-500/20 bg-emerald-500/5" : "border-amber-500/20 bg-amber-500/5"}>
+            <CardHeader>
+              <CardTitle>{canRun ? "Queue Ready" : "Complete Setup First"}</CardTitle>
+              <CardDescription>
+                The queue only starts when the page, URL, and at least one image are all ready.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {setupIssues.length === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Everything is ready. Click <strong>Start Boost Publish</strong>.
+                </div>
+              ) : (
+                setupIssues.map((issue) => (
+                  <div key={issue} className="flex items-center gap-2 text-sm text-amber-200">
+                    <Clock3 className="h-4 w-4" />
+                    {issue}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Boost Publish Setup</CardTitle>
@@ -574,5 +608,8 @@ export default function BoostPostPage() {
     </div>
   );
 }
+
+
+
 
 
