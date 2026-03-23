@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
-import { createBoostPost } from "@/lib/actions/posts";
 import {
   CheckCircle2,
   Clock3,
@@ -229,16 +228,24 @@ export default function BoostPostPage() {
       const uploadedUrl = item.uploadedUrl || (await uploadImage(item));
       updateItem(item.id, { status: "publishing", progress: 70 });
 
-      const result = await createBoostPost({
-        facebook_page_id: selectedPage || undefined,
-        title: headline.trim() || item.label,
-        short_text: message.trim() || undefined,
-        destination_url: sharedUrl.trim() || undefined,
-        cta,
-        media_url: uploadedUrl,
-        media_type: item.file.type || "image/jpeg",
-        status: "published",
+      const response = await fetch("/api/boost-post", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          facebook_page_id: selectedPage || undefined,
+          title: headline.trim() || item.label,
+          short_text: message.trim() || undefined,
+          destination_url: sharedUrl.trim() || undefined,
+          cta,
+          media_url: uploadedUrl,
+          media_type: item.file.type || "image/jpeg",
+          status: "published",
+        }),
       });
+
+      const result = await response.json();
 
       if (!result.success) {
         throw new Error(result.error);
@@ -608,6 +615,8 @@ export default function BoostPostPage() {
     </div>
   );
 }
+
+
 
 
 
