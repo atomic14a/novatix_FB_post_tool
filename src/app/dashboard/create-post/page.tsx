@@ -32,6 +32,7 @@ type FacebookPage = {
 
 type MetaLinkOption = {
   id: string;
+  name: string | null;
   short_code: string;
   meta_title: string;
   meta_description: string | null;
@@ -84,7 +85,6 @@ const CreatePostContent = () => {
   const [selectedPage, setSelectedPage] = useState("");
   const [selectedMetaLink, setSelectedMetaLink] = useState("");
   const [title, setTitle] = useState("");
-  const [displayText, setDisplayText] = useState("");
   const [destinationUrl, setDestinationUrl] = useState(metaFromQuery);
   const [cta, setCta] = useState("Learn More");
   const [selectedPageName, setSelectedPageName] = useState("");
@@ -105,7 +105,7 @@ const CreatePostContent = () => {
             .order("is_default", { ascending: false }),
           supabase
             .from("meta_links")
-            .select("id, short_code, meta_title, meta_description, image_url, click_count, destination_url")
+            .select("id, short_code, name, meta_title, meta_description, image_url, click_count, destination_url")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false }),
         ]);
@@ -125,7 +125,7 @@ const CreatePostContent = () => {
         if (editId) {
           const { data: post } = await supabase
             .from("posts")
-            .select("facebook_page_id, title, card_description, destination_url, cta")
+            .select("facebook_page_id, title, destination_url, cta")
             .eq("id", editId)
             .eq("user_id", user.id)
             .single();
@@ -133,8 +133,7 @@ const CreatePostContent = () => {
           if (post) {
             setSelectedPage(post.facebook_page_id || "");
             setTitle(post.title || "");
-            setDisplayText(post.card_description || "");
-            setDestinationUrl(post.destination_url || "");
+                        setDestinationUrl(post.destination_url || "");
             setCta(post.cta || "Learn More");
 
             const matchedMetaLink = availableMetaLinks.find(
@@ -212,8 +211,7 @@ const CreatePostContent = () => {
       const postData = {
         facebook_page_id: selectedPage || undefined,
         title: title.trim() || "\u200d",
-        card_description: displayText.trim() || undefined,
-        destination_url: destinationUrl.trim() || undefined,
+                destination_url: destinationUrl.trim() || undefined,
         cta: cta || undefined,
         status,
       };
@@ -273,7 +271,7 @@ const CreatePostContent = () => {
                   <option value="">Choose a saved Meta Link</option>
                   {metaLinks.map((link) => (
                     <option key={link.id} value={link.id}>
-                      {link.meta_title}
+                      {link.name || link.meta_title}
                     </option>
                   ))}
                 </Select>
@@ -294,8 +292,7 @@ const CreatePostContent = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Post Text</CardTitle>
-              <CardDescription>These fields help you control the card headline and the small label shown above it.</CardDescription>
+              <CardTitle>Post Text</CardTitle><CardDescription>Use the headline if you want to override the selected Meta Link title before publishing.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2">
@@ -303,15 +300,6 @@ const CreatePostContent = () => {
                 <Input id="title" placeholder="Text shown as the card headline" value={title} onChange={(e) => setTitle(e.target.value)} />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="displayText">Small Label</Label>
-                <Input
-                  id="displayText"
-                  placeholder="Example: main.com or custom short text"
-                  value={displayText}
-                  onChange={(e) => setDisplayText(e.target.value)}
-                />
-              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="cta">Call to Action</Label>
@@ -327,7 +315,7 @@ const CreatePostContent = () => {
           </Card>
 
           <div className="rounded-xl border border-border bg-secondary/20 p-4 text-sm text-muted-foreground">
-            Best flow: choose a saved Meta Link, adjust the Headline and Small Label if needed, then publish.
+            Best flow: choose a saved Meta Link, adjust the Headline if needed, then publish.
           </div>
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row">
@@ -355,7 +343,7 @@ const CreatePostContent = () => {
               <CardContent className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold">{selectedMetaLinkData.meta_title}</p>
+                    <p className="font-semibold">{selectedMetaLinkData.name || selectedMetaLinkData.meta_title}</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {selectedMetaLinkData.meta_description || "No description added."}
                     </p>
@@ -394,7 +382,7 @@ const CreatePostContent = () => {
 
                 {selectedMetaLinkData?.image_url ? (
                   <div className="aspect-[1.91/1] w-full overflow-hidden border-y bg-muted">
-                    <img src={selectedMetaLinkData.image_url} alt={selectedMetaLinkData.meta_title} className="h-full w-full object-cover" />
+                    <img src={selectedMetaLinkData.image_url} alt={selectedMetaLinkData.name || selectedMetaLinkData.meta_title} className="h-full w-full object-cover" />
                   </div>
                 ) : (
                   <div className="flex aspect-[1.91/1] w-full items-center justify-center border-y bg-muted/70 px-6 text-center text-sm text-muted-foreground">
@@ -404,7 +392,7 @@ const CreatePostContent = () => {
 
                 <div className="space-y-1 border-t bg-muted/10 p-3">
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {normalizeDisplayText(displayText || destinationUrl) || "yourdomain.com"}
+                    {normalizeDisplayText(destinationUrl) || "yourdomain.com"}
                   </div>
                   <div className="text-base font-semibold">{title || selectedMetaLinkData?.meta_title || "Your headline"}</div>
                   {cta && (
@@ -429,3 +417,5 @@ export default function CreatePostPage() {
     </Suspense>
   );
 }
+
+

@@ -595,11 +595,12 @@ export default function MetaLinksPage() {
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0 space-y-2">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold">{link.meta_title}</h3>
+                            <h3 className="font-semibold">{link.name || link.meta_title}</h3>
                             <Badge variant={link.is_active === false ? "secondary" : "success"}>
                               {link.is_active === false ? "Inactive" : "Active"}
                             </Badge>
                           </div>
+                                                    <p className="text-sm font-medium text-foreground/80">{link.meta_title}</p>
                           <p className="line-clamp-2 text-sm text-muted-foreground">
                             {link.meta_description || "No description added."}
                           </p>
@@ -646,4 +647,6 @@ export default function MetaLinksPage() {
     </div>
   );
 }
+
+
 
