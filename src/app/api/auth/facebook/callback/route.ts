@@ -1,8 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
 import { type NextRequest } from "next/server";
 
+const REQUIRED_FACEBOOK_PERMISSIONS = [
+  "pages_show_list",
+  "pages_read_engagement",
+  "pages_manage_posts",
+  "pages_manage_metadata",
+  "business_management",
+];
+
 // Helper to return a script that closes the popup and sends a message to the opener
-function postMessageAndClose(type: "FB_AUTH_SUCCESS" | "FB_AUTH_ERROR", payload?: any) {
+function postMessageAndClose(
+  type: "FB_AUTH_SUCCESS" | "FB_AUTH_ERROR",
+  payload: Record<string, unknown> = {}
+) {
   const message = JSON.stringify({ type, ...payload });
   const html = `
     <!DOCTYPE html>
@@ -24,6 +35,50 @@ function postMessageAndClose(type: "FB_AUTH_SUCCESS" | "FB_AUTH_ERROR", payload?
   return new Response(html, {
     headers: { "Content-Type": "text/html" },
   });
+}
+
+async function getPermissionDiagnostics(accessToken: string) {
+  try {
+    const permissionsUrl = `https://graph.facebook.com/v21.0/me/permissions?access_token=${accessToken}`;
+    const permissionsRes = await fetch(permissionsUrl);
+    const permissionsData = await permissionsRes.json();
+    const permissions = Array.isArray(permissionsData.data) ? permissionsData.data : [];
+
+    const grantedPermissions = permissions
+      .filter((permission: { permission: string; status: string }) => permission.status === "granted")
+      .map((permission: { permission: string }) => permission.permission);
+
+    const declinedPermissions = permissions
+      .filter((permission: { permission: string; status: string }) => permission.status !== "granted")
+      .map((permission: { permission: string; status: string }) => `${permission.permission} (${permission.status})`);
+
+    const missingPermissions = REQUIRED_FACEBOOK_PERMISSIONS.filter(
+      (permission) => !grantedPermissions.includes(permission)
+    );
+
+    let debugReason =
+      "Facebook returned zero Pages for this account. This usually means the selected Facebook profile does not have full access to a Page, the Business Integrations flow was not fully saved, or one of the required page permissions is still missing.";
+
+    if (missingPermissions.length > 0) {
+      debugReason = `Facebook did not grant all required permissions yet. Missing: ${missingPermissions.join(", ")}.`;
+    }
+
+    return {
+      grantedPermissions,
+      declinedPermissions,
+      missingPermissions,
+      debugReason,
+    };
+  } catch (error) {
+    console.error("Permission diagnostic fetch error:", error);
+    return {
+      grantedPermissions: [],
+      declinedPermissions: [],
+      missingPermissions: REQUIRED_FACEBOOK_PERMISSIONS,
+      debugReason:
+        "Facebook returned zero Pages and the permission diagnostic request also failed. Please reconnect and fully complete every Meta permission screen.",
+    };
+  }
 }
 
 // GET /api/auth/facebook/callback
@@ -116,13 +171,21 @@ export async function GET(request: NextRequest) {
 
     if (pagesData.error) {
       console.error("Pages fetch error:", pagesData.error);
-      return postMessageAndClose("FB_AUTH_ERROR", { error: "pages_fetch_failed" });
+      return postMessageAndClose("FB_AUTH_ERROR", {
+        error: pagesData.error.message || "pages_fetch_failed",
+        code: pagesData.error.code,
+        typeName: pagesData.error.type,
+      });
     }
 
     const pages = pagesData.data || [];
 
     if (pages.length === 0) {
-      return postMessageAndClose("FB_AUTH_SUCCESS", { count: 0 }); // Successfully connected but no pages
+      const diagnostics = await getPermissionDiagnostics(longLivedToken);
+      return postMessageAndClose("FB_AUTH_SUCCESS", {
+        count: 0,
+        ...diagnostics,
+      });
     }
 
     // Save pages to Supabase

@@ -14,8 +14,14 @@ export async function GET() {
     );
   }
 
-  // Request permissions for managing pages and publishing
-  const scope = "pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_metadata";
+  // Request permissions for managing pages and business integrations
+  const scope = [
+    "pages_show_list",
+    "pages_read_engagement",
+    "pages_manage_posts",
+    "pages_manage_metadata",
+    "business_management",
+  ].join(",");
 
   const facebookAuthUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
 
