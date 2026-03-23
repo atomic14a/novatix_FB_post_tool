@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Novatix Extension Lab</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Novatix</p>
+          <h1>Extension Lab</h1>
+        </div>
+        <span id="connection-badge" class="badge muted">Disconnected</span>
+      </header>
+
+      <section class="panel">
+        <h2>User Account</h2>
+        <div id="account-info" class="subtext">Log in to connect the extension with your website account.</div>
+        <div class="grid two">
+          <input id="email" type="email" placeholder="Email" />
+          <input id="password" type="password" placeholder="Password" />
+        </div>
+        <div class="actions">
+          <button id="login-btn" class="primary">Login</button>
+          <button id="logout-btn" class="ghost">Logout</button>
+          <button id="reconnect-btn" class="ghost">Reconnect</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Website Sync</h2>
+        <div id="sync-info" class="subtext">Waiting for extension login.</div>
+        <div class="actions">
+          <button id="open-dashboard-btn" class="ghost">Open Dashboard</button>
+          <button id="open-module-btn" class="ghost">Open Extension Module</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Facebook Detection</h2>
+        <div id="facebook-info" class="subtext">No Facebook context synced yet.</div>
+        <div class="actions">
+          <button id="detect-facebook-btn" class="ghost">Sync Facebook</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Job Queue</h2>
+        <div id="job-stats" class="subtext">No jobs fetched yet.</div>
+        <div id="current-job" class="job-card empty">No current job assigned.</div>
+        <div class="actions">
+          <button id="refresh-jobs-btn" class="ghost">Refresh Jobs</button>
+          <button id="run-job-btn" class="primary">Retry Last Job</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Quick Actions</h2>
+        <div class="actions wrap">
+          <button id="sync-btn" class="ghost">Sync</button>
+          <button id="open-site-btn" class="ghost">Open Website</button>
+          <button id="open-test-lab-btn" class="ghost">Open Test Lab</button>
+          <button id="disconnect-btn" class="ghost danger">Disconnect</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Status / Activity</h2>
+        <div id="activity-log" class="activity">No activity yet.</div>
+      </section>
+    </div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

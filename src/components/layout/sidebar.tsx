@@ -12,6 +12,7 @@ import {
   Link2,
   X,
   Sparkles,
+  Puzzle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/dashboard/facebook-pages", label: "Pages", icon: Facebook },
   { href: "/dashboard/meta-links", label: "Meta Links", icon: Link2 },
   { href: "/dashboard/create-post", label: "Publish", icon: PenSquare },
+  { href: "/dashboard/extension", label: "Extension", icon: Puzzle },
   { href: "/dashboard/drafts", label: "Drafts", icon: FileText },
   { href: "/dashboard/published", label: "Published", icon: Send },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },

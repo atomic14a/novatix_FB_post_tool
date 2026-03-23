@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Novatix Extension Lab",
+  "description": "Extension-based module for Novatix FB Tool.",
+  "version": "0.1.0",
+  "permissions": ["storage", "tabs", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://novatixteam.vercel.app/*",
+    "https://*.supabase.co/*",
+    "https://www.facebook.com/*",
+    "https://facebook.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Novatix Extension Lab",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/*", "https://facebook.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

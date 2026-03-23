@@ -1,0 +1,131 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, sans-serif;
+  --bg: #101425;
+  --panel: rgba(24, 31, 53, 0.92);
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #eef2ff;
+  --muted: #a7b0d6;
+  --primary: #5b6cff;
+  --secondary: #f7c844;
+  --danger: #ff6b6b;
+}
+body {
+  margin: 0;
+  min-width: 380px;
+  background:
+    radial-gradient(circle at top left, rgba(91, 108, 255, 0.28), transparent 36%),
+    radial-gradient(circle at top right, rgba(247, 200, 68, 0.22), transparent 32%),
+    var(--bg);
+  color: var(--text);
+}
+.shell {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+.header, .panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 18px;
+}
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  padding: 16px;
+}
+.eyebrow {
+  margin: 0 0 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--secondary);
+}
+.header h1, .panel h2 {
+  margin: 0;
+}
+.panel {
+  padding: 14px;
+}
+.subtext {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.grid.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  box-sizing: border-box;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.actions.wrap {
+  flex-wrap: wrap;
+}
+button {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button.primary {
+  background: var(--primary);
+  color: white;
+}
+button.ghost {
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+}
+button.danger {
+  color: #ffd5d5;
+}
+.badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.badge.muted {
+  background: rgba(255,255,255,0.08);
+  color: var(--muted);
+}
+.badge.success {
+  background: rgba(45, 212, 191, 0.16);
+  color: #80ffea;
+}
+.job-card, .activity {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  border-radius: 14px;
+  padding: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.job-card strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.activity-item + .activity-item {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
