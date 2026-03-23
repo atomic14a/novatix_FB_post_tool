@@ -253,7 +253,7 @@ async function findFacebookTab() {
   const facebookTabs = tabs.filter((tab) => isFacebookUrl(tab.url));
   if (!facebookTabs.length) return null;
 
-  const activeFacebookTab = facebookTabs.find((tab) => tab.active && tab.windowId === chrome.windows.WINDOW_ID_CURRENT);
+  const activeFacebookTab = facebookTabs.find((tab) => tab.active);
   return activeFacebookTab || facebookTabs[0] || null;
 }
 
@@ -266,26 +266,49 @@ async function readFacebookContextFromTab(tabId) {
   const injected = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => {
-      const extractPageId = (url) => {
-        const match = url.match(/facebook\.com\/(?:profile\.php\?id=)?([^/?&]+)/i);
-        return match ? match[1] : null;
+      const cleanText = (value) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "");
+      const getRouteType = (url) => {
+        try {
+          const parsed = new URL(url);
+          const path = parsed.pathname.toLowerCase();
+          if (path.startsWith("/messages") || path.startsWith("/t/")) return "messages";
+          if (path === "/" || path === "") return "home";
+          if (path.startsWith("/profile.php")) return "profile";
+          const slug = path.split("/").filter(Boolean)[0] || "";
+          if (!slug || ["login", "messages", "notifications", "friends", "bookmarks", "events"].includes(slug)) return "generic";
+          return "entity";
+        } catch {
+          return "unknown";
+        }
       };
-
-      const title = document.title || "";
-      const metaTitle = document.querySelector("meta[property='og:title']")?.getAttribute("content") || null;
-      const heading = document.querySelector("h1")?.textContent?.trim() || null;
-      const candidateName = heading || metaTitle || title || null;
-
+      const detectHeading = () => {
+        const selectors = ["[role='main'] h1", "h1", "[aria-level='1']", "[role='main'] h2"];
+        for (const selector of selectors) {
+          const el = document.querySelector(selector);
+          const text = cleanText(el?.textContent || "");
+          if (text) return text;
+        }
+        return null;
+      };
+      const title = cleanText(document.title || "");
+      const routeType = getRouteType(window.location.href);
+      const heading = detectHeading();
+      const badTitles = new Set(["facebook", "log in or sign up", "login", "chats", "messages"]);
+      const pageName = (routeType === "entity" || routeType === "profile") && heading && !badTitles.has(heading.toLowerCase()) ? heading : null;
+      const accountName = routeType !== "messages" && routeType !== "generic" && routeType !== "home" && heading && !badTitles.has(heading.toLowerCase()) ? heading : null;
+      const pageId = pageName ? (new URL(window.location.href).searchParams.get("id") || window.location.pathname.split("/").filter(Boolean)[0] || null) : null;
       return {
         facebook_detected: true,
-        facebook_logged_in: !title.toLowerCase().includes("log in") && !title.toLowerCase().includes("login"),
-        account_name: candidateName,
-        page_name: heading || title || candidateName,
-        page_id: extractPageId(window.location.href),
-        detected_pages_count: 1,
+        facebook_logged_in: !Boolean(document.querySelector("form input[type='password']")) && !title.toLowerCase().includes("log in") && !title.toLowerCase().includes("login"),
+        account_name: accountName,
+        page_name: pageName,
+        page_id: pageId,
+        detected_pages_count: pageName ? 1 : 0,
         context_data: {
           url: window.location.href,
           title,
+          route_type: routeType,
+          heading,
           referrer: document.referrer || null,
         },
       };
@@ -310,6 +333,7 @@ async function detectFacebookContext() {
       page_name: result.page_name || null,
       page_id: result.page_id || null,
       source_tab_id: facebookTab.id,
+      route_type: result.context_data?.route_type || null,
     });
   }
   return result;
