@@ -1,4 +1,3 @@
-import { createHash } from "crypto";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -110,14 +109,13 @@ export async function GET(
   const envAppUrl = process.env.NEXT_PUBLIC_APP_URL || "";
   const appUrl = envAppUrl && !envAppUrl.includes("localhost") ? envAppUrl : `${proto}://${host}`;
 
-  const hasServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
   const supabase = createClient(supabaseUrl, serviceKey);
 
   const { data: metaLink, error } = await supabase
     .from("meta_links")
-    .select("*")
+    .select("id, user_id, destination_url, display_domain, image_url, image_type, meta_title, meta_description, is_active")
     .eq("short_code", code)
     .eq("is_active", true)
     .single();
@@ -130,34 +128,6 @@ export async function GET(
   const isBot = isBotTraffic(userAgent);
 
   if (!isBot) {
-    if (hasServiceRole) {
-      const referer = requestHeaders.get("referer");
-      const ipAddress =
-        requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-        requestHeaders.get("x-real-ip") ||
-        "";
-      const ipHash = ipAddress
-        ? createHash("sha256").update(ipAddress).digest("hex").slice(0, 24)
-        : null;
-
-      await supabase.from("meta_link_clicks").insert({
-        meta_link_id: metaLink.id,
-        user_id: metaLink.user_id,
-        ip_hash: ipHash,
-        user_agent: userAgent || null,
-        referer: referer || null,
-      });
-
-      await supabase
-        .from("meta_links")
-        .update({
-          click_count: (metaLink.click_count || 0) + 1,
-          last_clicked_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", metaLink.id);
-    }
-
     return NextResponse.redirect(metaLink.destination_url, { status: 302 });
   }
 
