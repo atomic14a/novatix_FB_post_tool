@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { EXTENSION_ROUTES } from "@/lib/extension/constants";
-import { Cable, Chrome, Clock3, Cpu, ExternalLink, Link2, RefreshCw, ShieldCheck } from "lucide-react";
+import { Cable, Chrome, Clock3, Cpu, ExternalLink, Link2, RefreshCw, ShieldCheck, UserRound, Flag } from "lucide-react";
 
 type ExtensionSession = {
   id: string;
@@ -20,26 +20,48 @@ type ExtensionSession = {
   updated_at: string;
 };
 
+type ExtensionContext = {
+  account_name: string | null;
+  page_name: string | null;
+  page_id: string | null;
+  facebook_detected: boolean;
+  facebook_logged_in: boolean;
+  synced_at: string;
+};
+
 export default function ExtensionHubPage() {
   const supabase = createClient();
   const [session, setSession] = useState<ExtensionSession | null>(null);
+  const [context, setContext] = useState<ExtensionContext | null>(null);
   const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
     async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       setUserEmail(user.email || "");
 
-      const { data } = await supabase
-        .from("extension_sessions")
-        .select("id, browser_name, platform, extension_version, is_online, last_seen, updated_at")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const [sessionRes, contextRes] = await Promise.all([
+        supabase
+          .from("extension_sessions")
+          .select("id, browser_name, platform, extension_version, is_online, last_seen, updated_at")
+          .eq("user_id", user.id)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("extension_facebook_contexts")
+          .select("account_name, page_name, page_id, facebook_detected, facebook_logged_in, synced_at")
+          .eq("user_id", user.id)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
 
-      setSession((data as ExtensionSession | null) || null);
+      setSession((sessionRes.data as ExtensionSession | null) || null);
+      setContext((contextRes.data as ExtensionContext | null) || null);
     }
 
     void loadData();
@@ -51,11 +73,11 @@ export default function ExtensionHubPage() {
     <div className="space-y-6">
       <PageHeader
         title="Extension Hub"
-        description="Manage the new browser-extension system without affecting your current publishing flow."
+        description="Manage the new browser-extension system without affecting your current publishing flow or the old app-based page connection flow."
       >
-        <Button onClick={() => window.open(EXTENSION_ROUTES.testLab, "_self")} className="gap-2">
+        <Button onClick={() => window.open(EXTENSION_ROUTES.post, "_self")} className="gap-2">
           <Cable className="h-4 w-4" />
-          Open Test Lab
+          Open Extension Post
         </Button>
       </PageHeader>
 
@@ -95,15 +117,59 @@ export default function ExtensionHubPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Detected Facebook Context</CardTitle>
+            <CardDescription>Auto-detected from the Facebook tab through the extension, without touching the old page-connect flow.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3">
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <UserRound className="h-4 w-4 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Facebook Account</p>
+                  <p className="text-xs text-muted-foreground">{context?.account_name || "Not detected yet"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <Flag className="h-4 w-4 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Current Facebook Page</p>
+                  <p className="text-xs text-muted-foreground">{context?.page_name || "No page detected yet"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Login State</p>
+                  <p className="text-xs text-muted-foreground">{context?.facebook_logged_in ? "Facebook is logged in" : "Facebook login not confirmed yet"}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => window.open(EXTENSION_ROUTES.context, "_self")} className="gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Full Context
+              </Button>
+              <Button onClick={() => window.open(EXTENSION_ROUTES.post, "_self")} className="gap-2">
+                <Cable className="h-4 w-4" />
+                Extension Post
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card>
+          <CardHeader>
             <CardTitle>Flow B Instructions</CardTitle>
             <CardDescription>Extension-first login that opens the website into the same account ecosystem.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-xl border border-border p-4 text-sm text-muted-foreground">
               1. Install the new Chrome extension.
-              <br />2. Sign in from the extension popup.
+              <br />2. Sign in from the extension popup or use the existing website login.
               <br />3. The extension opens this website automatically using the shared auth bridge.
-              <br />4. Jobs, logs, status, and Facebook context will appear in this module.
+              <br />4. Jobs, logs, status, Facebook context, and extension posting will appear only in this module.
             </div>
             <div className="grid grid-cols-1 gap-3">
               <div className="flex items-center gap-3 rounded-xl border border-border p-3">
@@ -132,11 +198,23 @@ export default function ExtensionHubPage() {
                 <Link2 className="h-4 w-4" />
                 View Logs
               </Button>
-              <Button onClick={() => window.open(EXTENSION_ROUTES.context, "_self")} className="gap-2">
+              <Button onClick={() => window.open(EXTENSION_ROUTES.testLab, "_self")} className="gap-2">
                 <ExternalLink className="h-4 w-4" />
-                Facebook Context
+                Open Test Lab
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Safety Boundary</CardTitle>
+            <CardDescription>This module is isolated from your old working app-based tools.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <div className="rounded-xl border border-border p-4">Your old publish button and current create-post flow remain separate.</div>
+            <div className="rounded-xl border border-border p-4">Your old page-connect flow remains separate.</div>
+            <div className="rounded-xl border border-border p-4">Extension posting will live only inside the new Extension Post page.</div>
           </CardContent>
         </Card>
       </div>

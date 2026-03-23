@@ -7,6 +7,7 @@ import { EXTENSION_ROUTES } from "@/lib/extension/constants";
 
 const items = [
   { href: EXTENSION_ROUTES.hub, label: "Hub" },
+  { href: EXTENSION_ROUTES.post, label: "Extension Post" },
   { href: EXTENSION_ROUTES.testLab, label: "Test Lab" },
   { href: EXTENSION_ROUTES.jobs, label: "Jobs" },
   { href: EXTENSION_ROUTES.logs, label: "Logs" },
