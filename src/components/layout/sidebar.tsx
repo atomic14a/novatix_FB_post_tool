@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Facebook,
+  Rocket,
   PenSquare,
   FileText,
   Send,
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/dashboard/facebook-pages", label: "Pages", icon: Facebook },
   { href: "/dashboard/meta-links", label: "Meta Links", icon: Link2 },
   { href: "/dashboard/create-post", label: "Publish", icon: PenSquare },
+  { href: "/dashboard/boost-post", label: "Boost Post", icon: Rocket },
   { href: "/dashboard/extension", label: "Extension", icon: Puzzle },
   { href: "/dashboard/drafts", label: "Drafts", icon: FileText },
   { href: "/dashboard/published", label: "Published", icon: Send },
