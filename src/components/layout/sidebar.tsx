@@ -112,7 +112,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         <div className="border-t border-sidebar-border p-4">
           <p className="text-center text-[10px] text-muted-foreground/60">
-            © 2026 Novatix Solution
+            (c) 2026 Novatix Solution
           </p>
         </div>
       </aside>
